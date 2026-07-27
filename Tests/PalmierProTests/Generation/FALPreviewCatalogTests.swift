@@ -1,0 +1,46 @@
+import Testing
+@testable import PalmierPro
+
+@Suite("FAL provider preview catalog")
+@MainActor
+struct FALPreviewCatalogTests {
+    @Test func offersEveryGenerationType() {
+        let catalog = FALPreviewCatalog.shared
+
+        #expect(!catalog.image.isEmpty)
+        #expect(!catalog.video.isEmpty)
+        #expect(!catalog.audio.isEmpty)
+        #expect(!catalog.upscale.isEmpty)
+    }
+
+    @Test func exposesTheReferenceAndFrameControlsNeededForVideo() throws {
+        let model = try #require(FALPreviewCatalog.shared.video.first {
+            $0.id == "bytedance/seedance-2.0/fast"
+        })
+
+        #expect(model.supportsFirstFrame)
+        #expect(model.supportsLastFrame)
+        #expect(model.maxReferenceImages > 0)
+        #expect(model.maxReferenceVideos > 0)
+        #expect(model.maxReferenceAudios > 0)
+    }
+
+    @Test func coversThePlannedAudioWorkflows() {
+        let categories = Set(FALPreviewCatalog.shared.audio.map(\.category))
+
+        #expect(categories.contains(.tts))
+        #expect(categories.contains(.music))
+        #expect(categories.contains(.sfx))
+        #expect(categories.contains(.cleanup))
+        #expect(categories.contains(.dubbing))
+    }
+
+    @Test func separatesExecutionProviderFromModelVendor() {
+        let model = FALPreviewCatalog.shared.image.first {
+            $0.id == "fal-ai/nano-banana-2"
+        }
+
+        #expect(GenerationProvider.fal.displayName == "fal.ai")
+        #expect(model?.entry.providerName == "Google")
+    }
+}

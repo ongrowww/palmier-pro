@@ -7,6 +7,7 @@ struct GenerationView: View {
     @Bindable var account = AccountService.shared
     @State var prompt = ""
     @State var selectedType: GenerationType = .video
+    @State var selectedProvider: GenerationProvider = .palmierCloud
     @State var selectedVideoModelIndex = 0
     @State var selectedImageModelIndex = 0
     @State var selectedAudioModelIndex = 0
@@ -284,6 +285,19 @@ struct GenerationView: View {
             editFolderId = nil
             editor.clearPendingGenerationPanelState(preservingReplacement: true)
         }
+        .onChange(of: selectedProvider) { _, _ in
+            guard !isPopulatingPanel else { return }
+            selectedVideoModelIndex = 0
+            selectedImageModelIndex = 0
+            selectedAudioModelIndex = 0
+            selectedUpscaleModelIndex = 0
+            normalizeModelSelection()
+            resetSettings()
+            clearReferences()
+            if selectedType == .audio { resetAudioState() }
+            editFolderId = nil
+            editor.clearPendingGenerationPanelState(preservingReplacement: true)
+        }
         .onChange(of: selectedVideoModelIndex) { _, _ in
             guard !isPopulatingPanel else { return }
             if selectedType == .video {
@@ -434,6 +448,7 @@ struct GenerationView: View {
 
     private var inputToolbar: some View {
         HStack(spacing: AppTheme.Spacing.sm) {
+            providerPicker
             modelPicker
             if showsFramesRefsPicker { framesRefsModePicker }
             if selectedType == .audio, audioModel.voices != nil {

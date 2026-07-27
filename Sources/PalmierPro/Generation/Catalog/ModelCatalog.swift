@@ -190,6 +190,42 @@ struct CatalogEntry: Decodable, Sendable {
         }
     }
 
+    init(
+        id: String,
+        kind: Kind,
+        displayName: String,
+        providerName: String? = nil,
+        description: String? = nil,
+        allowedEndpoints: [String],
+        responseShape: ResponseShape,
+        uiCapabilities: UICapabilities,
+        creditsPerSecond: [String: Double]? = nil,
+        audioDiscountRate: [String: Double]? = nil,
+        creditsPerImage: [String: Double]? = nil,
+        qualities: [String]? = nil,
+        audioPricing: AudioPricing? = nil,
+        creditsPerSecondUpscale: Double? = nil,
+        upscalePricing: UpscalePricing? = nil,
+        paidOnly: Bool = false
+    ) {
+        self.id = id
+        self.kind = kind
+        self.displayName = displayName
+        self.providerName = providerName
+        self.description = description
+        self.allowedEndpoints = allowedEndpoints
+        self.responseShape = responseShape
+        self.uiCapabilities = uiCapabilities
+        self.creditsPerSecond = creditsPerSecond
+        self.audioDiscountRate = audioDiscountRate
+        self.creditsPerImage = creditsPerImage
+        self.qualities = qualities
+        self.audioPricing = audioPricing
+        self.creditsPerSecondUpscale = creditsPerSecondUpscale
+        self.upscalePricing = upscalePricing
+        self.paidOnly = paidOnly
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id, kind, displayName, providerName, description, allowedEndpoints, responseShape, uiCapabilities
         case creditsPerSecond, audioDiscountRate, creditsPerImage, qualities

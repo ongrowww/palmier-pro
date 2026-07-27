@@ -9,10 +9,18 @@ struct VideoModelProviderGroup: Identifiable {
 // Model catalog selection and per-model capability state.
 extension GenerationView {
 
-    var videoModels: [VideoModelConfig] { ModelCatalog.shared.video }
-    var imageModels: [ImageModelConfig] { ModelCatalog.shared.image }
-    var audioModels: [AudioModelConfig] { ModelCatalog.shared.audio }
-    var upscaleModels: [UpscaleModelConfig] { ModelCatalog.shared.upscale }
+    var videoModels: [VideoModelConfig] {
+        selectedProvider == .palmierCloud ? ModelCatalog.shared.video : FALPreviewCatalog.shared.video
+    }
+    var imageModels: [ImageModelConfig] {
+        selectedProvider == .palmierCloud ? ModelCatalog.shared.image : FALPreviewCatalog.shared.image
+    }
+    var audioModels: [AudioModelConfig] {
+        selectedProvider == .palmierCloud ? ModelCatalog.shared.audio : FALPreviewCatalog.shared.audio
+    }
+    var upscaleModels: [UpscaleModelConfig] {
+        selectedProvider == .palmierCloud ? ModelCatalog.shared.upscale : FALPreviewCatalog.shared.upscale
+    }
 
     var videoModel: VideoModelConfig { selectedModel(videoModels, at: selectedVideoModelIndex) }
     var imageModel: ImageModelConfig { selectedModel(imageModels, at: selectedImageModelIndex) }
@@ -30,9 +38,10 @@ extension GenerationView {
         upscaleModels.isEmpty ? GenerationType.allCases.filter { $0 != .upscale } : GenerationType.allCases
     }
 
-    var aiAllowed: Bool { account.aiAllowed }
+    var aiAllowed: Bool { selectedProvider == .palmierCloud && account.aiAllowed }
 
     var currentModelLocked: Bool {
+        guard selectedProvider == .palmierCloud else { return false }
         guard !account.isPaid else { return false }
         switch selectedType {
         case .video: return videoModel.paidOnly
@@ -47,7 +56,9 @@ extension GenerationView {
         return models[safeIndex]
     }
 
-    private func isAvailable(_ paidOnly: Bool) -> Bool { account.isPaid || !paidOnly }
+    private func isAvailable(_ paidOnly: Bool) -> Bool {
+        selectedProvider != .palmierCloud || account.isPaid || !paidOnly
+    }
 
     var enabledVideoModels: [(index: Int, model: VideoModelConfig)] {
         videoModels.enumerated()

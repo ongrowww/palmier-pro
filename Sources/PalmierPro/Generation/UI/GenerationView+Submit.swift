@@ -78,6 +78,7 @@ extension GenerationView {
     }
 
     private var remainingCredits: Int? {
+        guard selectedProvider == .palmierCloud else { return nil }
         guard let budget = AccountService.shared.budgetCredits else { return nil }
         return max(0, budget - AccountService.shared.spentCredits)
     }
@@ -107,37 +108,68 @@ extension GenerationView {
     }
 
     var costEstimateLabel: some View {
-        HStack(spacing: AppTheme.Spacing.xs) {
-            Image(systemName: "dollarsign.circle.fill")
-                .font(.system(size: AppTheme.FontSize.sm))
-            Text(estimatedCost.map { $0.formatted() } ?? "—")
-                .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
-                .monospacedDigit()
-                .lineLimit(1)
+        Group {
+            if selectedProvider == .fal {
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    Image(systemName: "key.horizontal.fill")
+                        .font(.system(size: AppTheme.FontSize.sm))
+                    Text("BYOK")
+                        .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(AppTheme.Status.warningColor)
+                .help("Billed through your fal.ai account. Cost estimation comes with provider integration.")
+            } else {
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.system(size: AppTheme.FontSize.sm))
+                    Text(estimatedCost.map { $0.formatted() } ?? "—")
+                        .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+                .foregroundStyle(hasInsufficientCredits ? .red : AppTheme.Text.secondaryColor)
+                .help(costHelpText)
+            }
         }
-        .foregroundStyle(hasInsufficientCredits ? .red : AppTheme.Text.secondaryColor)
-        .help(costHelpText)
     }
 
+    @ViewBuilder
     var submitButton: some View {
-        Button {
-            if aiAllowed { submitGeneration() }
-            else if !account.isMisconfigured { Task { await account.signInWithGoogle() } }
-        } label: {
-            Image(systemName: aiAllowed ? "arrow.up" : "person.crop.circle")
-                .font(.system(size: AppTheme.FontSize.sm, weight: .bold))
-                .frame(width: AppTheme.IconSize.sm, height: AppTheme.IconSize.sm)
+        if selectedProvider == .fal {
+            Button {} label: {
+                Image(systemName: "hammer.fill")
+                    .font(.system(size: AppTheme.FontSize.sm, weight: .bold))
+                    .frame(width: AppTheme.IconSize.sm, height: AppTheme.IconSize.sm)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .controlSize(.regular)
+            .tint(AppTheme.Accent.primary)
+            .disabled(true)
+            .opacity(AppTheme.Opacity.strong)
+            .accessibilityLabel("FAL provider preview")
+            .help("UI preview only. FAL generation is not connected yet.")
+        } else {
+            Button {
+                if aiAllowed { submitGeneration() }
+                else if !account.isMisconfigured { Task { await account.signInWithGoogle() } }
+            } label: {
+                Image(systemName: aiAllowed ? "arrow.up" : "person.crop.circle")
+                    .font(.system(size: AppTheme.FontSize.sm, weight: .bold))
+                    .frame(width: AppTheme.IconSize.sm, height: AppTheme.IconSize.sm)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .controlSize(.regular)
+            .tint(AppTheme.Accent.primary)
+            .accessibilityLabel(aiAllowed ? (selectedType == .upscale ? "Upscale" : "Generate") : "Sign in")
+            .disabled(aiAllowed ? !canSubmit : account.isMisconfigured || account.isSigningIn)
+            .opacity((aiAllowed ? canSubmit : !account.isMisconfigured && !account.isSigningIn) ? AppTheme.Opacity.opaque : AppTheme.Opacity.strong)
+            .help(aiAllowed
+                ? (selectedType == .upscale ? "Upscale source media" : "")
+                : (account.isMisconfigured ? "AI is unavailable" : account.isSigningIn ? "Opening Google" : "Sign in to generate"))
         }
-        .buttonStyle(.glassProminent)
-        .buttonBorderShape(.circle)
-        .controlSize(.regular)
-        .tint(AppTheme.Accent.primary)
-        .accessibilityLabel(aiAllowed ? (selectedType == .upscale ? "Upscale" : "Generate") : "Sign in")
-        .disabled(aiAllowed ? !canSubmit : account.isMisconfigured || account.isSigningIn)
-        .opacity((aiAllowed ? canSubmit : !account.isMisconfigured && !account.isSigningIn) ? AppTheme.Opacity.opaque : AppTheme.Opacity.strong)
-        .help(aiAllowed
-            ? (selectedType == .upscale ? "Upscale source media" : "")
-            : (account.isMisconfigured ? "AI is unavailable" : account.isSigningIn ? "Opening Google" : "Sign in to generate"))
     }
 
     // MARK: - Actions

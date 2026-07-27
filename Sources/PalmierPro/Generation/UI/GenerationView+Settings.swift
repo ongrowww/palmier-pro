@@ -63,6 +63,45 @@ extension GenerationView {
 
     // MARK: - Model picker
 
+    var providerPicker: some View {
+        Menu {
+            ForEach(GenerationProvider.allCases) { provider in
+                Button {
+                    selectedProvider = provider
+                } label: {
+                    Label {
+                        VStack(alignment: .leading) {
+                            Text(provider.displayName)
+                            Text(provider.detail)
+                        }
+                    } icon: {
+                        Image(systemName: provider.icon)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: AppTheme.Spacing.xs) {
+                Image(systemName: selectedProvider.icon)
+                    .font(.system(size: AppTheme.FontSize.xxs))
+                    .foregroundStyle(selectedProvider == .fal
+                        ? AppTheme.Status.warningColor
+                        : AppTheme.Text.tertiaryColor)
+                Text(selectedProvider.displayName)
+                    .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
+                    .foregroundStyle(AppTheme.Text.secondaryColor)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: AppTheme.FontSize.micro, weight: .semibold))
+                    .foregroundStyle(AppTheme.Text.tertiaryColor)
+            }
+            .padding(.horizontal, AppTheme.Spacing.xs)
+            .padding(.vertical, AppTheme.Spacing.xxs)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .hoverHighlight()
+        .help(selectedProvider.detail)
+    }
+
     var modelPicker: some View {
         Menu {
             switch selectedType {
@@ -100,10 +139,14 @@ extension GenerationView {
                 }
             }
             Divider()
-            Button {
-                SettingsWindowController.shared.show(tab: .models)
-            } label: {
-                Label("Add models…", systemImage: "plus")
+            if selectedProvider == .palmierCloud {
+                Button {
+                    SettingsWindowController.shared.show(tab: .models)
+                } label: {
+                    Label("Add models…", systemImage: "plus")
+                }
+            } else {
+                Label("FAL catalog preview", systemImage: "hammer")
             }
         } label: {
             HStack(spacing: AppTheme.Spacing.xs) {
