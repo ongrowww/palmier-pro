@@ -52,3 +52,11 @@ After the UX is approved:
 
 Direct vendor adapters should only be added for features that FAL does not
 expose, such as account-specific voice-library or voice-cloning workflows.
+
+## Internal preview build
+
+`scripts/package-byok-preview.sh` creates an isolated, ad-hoc signed test DMG.
+The preview uses a separate bundle identifier and display name, disables
+Sparkle updates, defaults to fal.ai, and keeps Palmier Cloud disabled when its
+backend configuration is not part of the build. It contains no API key and
+cannot submit FAL jobs yet.

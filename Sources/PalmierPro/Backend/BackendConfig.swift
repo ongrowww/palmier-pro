@@ -6,6 +6,14 @@ enum BackendConfig {
     static let convexDeploymentURL: URL? = string("PalmierConvexDeploymentURL").flatMap { URL(string: $0) }
     static let convexHttpURL: URL? = string("PalmierConvexHttpURL").flatMap { URL(string: $0) }
 
+    static var palmierCloudAvailable: Bool {
+        #if BYOK_PREVIEW
+        false
+        #else
+        clerkPublishableKey != nil && convexDeploymentURL != nil && convexHttpURL != nil
+        #endif
+    }
+
     private static func string(_ key: String) -> String? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
               !value.isEmpty

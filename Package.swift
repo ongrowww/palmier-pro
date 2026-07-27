@@ -11,6 +11,7 @@ let package = Package(
     traits: [
         .trait(name: "BundledSpeech", description: "Include on-device speech models and MLX."),
         .trait(name: "ProductionTelemetry", description: "Include Sentry and PostHog telemetry."),
+        .trait(name: "BYOKPreview", description: "Build the OnGROW provider preview without Palmier Cloud."),
     ],
     dependencies: [
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0"),
@@ -80,6 +81,7 @@ let package = Package(
             swiftSettings: [
                 .define("BUNDLED_SPEECH", .when(traits: ["BundledSpeech"])),
                 .define("PRODUCTION_TELEMETRY", .when(traits: ["ProductionTelemetry"])),
+                .define("BYOK_PREVIEW", .when(traits: ["BYOKPreview"])),
             ],
             plugins: ["MetalCIKernelPlugin"]
         ),

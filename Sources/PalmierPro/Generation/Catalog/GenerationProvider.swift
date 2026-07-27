@@ -6,6 +6,17 @@ enum GenerationProvider: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    static var defaultProvider: GenerationProvider {
+        BackendConfig.palmierCloudAvailable ? .palmierCloud : .fal
+    }
+
+    var isAvailable: Bool {
+        switch self {
+        case .palmierCloud: BackendConfig.palmierCloudAvailable
+        case .fal: true
+        }
+    }
+
     var displayName: String {
         switch self {
         case .palmierCloud: "Palmier"
@@ -29,6 +40,7 @@ enum GenerationProvider: String, CaseIterable, Identifiable {
 
     var detail: String {
         switch self {
+        case .palmierCloud where !isAvailable: "Unavailable in this build"
         case .palmierCloud: "Palmier account and credits"
         case .fal: "Bring your own FAL API key"
         }

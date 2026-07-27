@@ -44,4 +44,12 @@ struct FALPreviewCatalogTests {
         #expect(GenerationProvider.fal.toolbarDisplayName == "fal.ai · BYOK")
         #expect(model?.entry.providerName == "Google")
     }
+
+    @Test func fallsBackToFALWhenPalmierCloudIsUnavailable() {
+        #expect(GenerationProvider.palmierCloud.isAvailable == BackendConfig.palmierCloudAvailable)
+        if !BackendConfig.palmierCloudAvailable {
+            #expect(GenerationProvider.defaultProvider == .fal)
+            #expect(GenerationProvider.palmierCloud.detail == "Unavailable in this build")
+        }
+    }
 }

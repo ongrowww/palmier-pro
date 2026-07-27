@@ -7,7 +7,7 @@ struct GenerationView: View {
     @Bindable var account = AccountService.shared
     @State var prompt = ""
     @State var selectedType: GenerationType = .video
-    @State var selectedProvider: GenerationProvider = .palmierCloud
+    @State var selectedProvider: GenerationProvider = .defaultProvider
     @State var selectedVideoModelIndex = 0
     @State var selectedImageModelIndex = 0
     @State var selectedAudioModelIndex = 0

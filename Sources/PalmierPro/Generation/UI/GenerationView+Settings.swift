@@ -78,6 +78,7 @@ extension GenerationView {
                         Image(systemName: provider.icon)
                     }
                 }
+                .disabled(!provider.isAvailable)
             }
         } label: {
             HStack(spacing: AppTheme.Spacing.xs) {

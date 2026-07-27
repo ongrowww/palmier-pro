@@ -6,15 +6,18 @@ set -euo pipefail
 #   scripts/bundle.sh debug --fast              # fastest: skip dSYM + deep sign, just env+build
 #   scripts/bundle.sh release --sign            # build + Developer ID codesign
 #   scripts/bundle.sh release --dist            # build + sign + notarize + staple + DMG
+#   scripts/bundle.sh debug --byok-preview       # ad-hoc OnGROW preview without Palmier Cloud
 
 CONFIG="release"
 MODE="dev"
+BYOK_PREVIEW=false
 for arg in "$@"; do
   case "$arg" in
     release|debug) CONFIG="$arg" ;;
     --fast)        MODE="fast" ;;
     --sign)        MODE="sign" ;;
     --dist)        MODE="dist" ;;
+    --byok-preview) BYOK_PREVIEW=true ;;
     *) echo "unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
@@ -51,6 +54,9 @@ TRAITS="BundledSpeech"
 if [ "$CONFIG" = "release" ]; then
   TRAITS="$TRAITS,ProductionTelemetry"
 fi
+if [ "$BYOK_PREVIEW" = true ]; then
+  TRAITS="$TRAITS,BYOKPreview"
+fi
 BUILD_ARGS=(-c "$CONFIG" --traits "$TRAITS")
 swift build "${BUILD_ARGS[@]}"
 BIN="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)/PalmierPro"
@@ -61,6 +67,15 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN" "$APP/Contents/MacOS/PalmierPro"
 cp "$RESOURCES/Info.plist" "$APP/Contents/Info.plist"
+
+if [ "$BYOK_PREVIEW" = true ]; then
+  echo "==> Configuring isolated BYOK preview bundle"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier de.ongrow.palmier-pro.byok-preview" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Palmier Pro BYOK Preview" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleName Palmier Pro BYOK Preview" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :SUEnableAutomaticChecks false" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Delete :SUFeedURL" "$APP/Contents/Info.plist"
+fi
 
 if [ -n "$SENTRY_DSN" ]; then
   echo "==> Injecting SentryDSN into Info.plist"
