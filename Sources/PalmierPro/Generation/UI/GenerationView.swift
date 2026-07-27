@@ -5,6 +5,7 @@ struct GenerationView: View {
 
     @Environment(EditorViewModel.self) var editor
     @Bindable var account = AccountService.shared
+    @Bindable var falCredentials = FALCredentialState.shared
     @State var prompt = ""
     @State var selectedType: GenerationType = .video
     @State var selectedProvider: GenerationProvider = .defaultProvider
@@ -262,6 +263,7 @@ struct GenerationView: View {
         .padding(.bottom, AppTheme.Spacing.sm)
         .frame(maxHeight: max(0, CGFloat(maxPanelHeight)), alignment: .top)
         .onAppear {
+            falCredentials.refresh()
             let hadSeed = editor.pendingPanelSeed != nil
             consumePendingPanelSeed()
             // A seeded edit may reuse a now-disabled model; keep its selection.

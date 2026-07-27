@@ -123,8 +123,12 @@ extension GenerationView {
     @ViewBuilder
     var submitButton: some View {
         if selectedProvider == .fal {
-            Button {} label: {
-                Image(systemName: "hammer.fill")
+            Button {
+                if !falCredentials.hasKey {
+                    SettingsWindowController.shared.show(tab: .providers)
+                }
+            } label: {
+                Image(systemName: falCredentials.hasKey ? "hammer.fill" : "key.horizontal")
                     .font(.system(size: AppTheme.FontSize.sm, weight: .bold))
                     .frame(width: AppTheme.IconSize.sm, height: AppTheme.IconSize.sm)
             }
@@ -132,10 +136,12 @@ extension GenerationView {
             .buttonBorderShape(.circle)
             .controlSize(.regular)
             .tint(AppTheme.Accent.primary)
-            .disabled(true)
-            .opacity(AppTheme.Opacity.strong)
-            .accessibilityLabel("FAL provider preview")
-            .help("UI preview only. FAL generation is not connected yet.")
+            .disabled(falCredentials.hasKey)
+            .opacity(falCredentials.hasKey ? AppTheme.Opacity.strong : AppTheme.Opacity.opaque)
+            .accessibilityLabel(falCredentials.hasKey ? "FAL integration preview" : "Add FAL API key")
+            .help(falCredentials.hasKey
+                ? "Queue transport is ready. Model mapping and cost confirmation are not connected yet."
+                : "Add a fal.ai API key in Settings.")
         } else {
             Button {
                 if aiAllowed { submitGeneration() }

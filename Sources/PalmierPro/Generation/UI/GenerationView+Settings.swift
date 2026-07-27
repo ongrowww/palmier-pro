@@ -80,6 +80,12 @@ extension GenerationView {
                 }
                 .disabled(!provider.isAvailable)
             }
+            Divider()
+            Button {
+                SettingsWindowController.shared.show(tab: .providers)
+            } label: {
+                Label("Manage provider keys…", systemImage: "key.horizontal")
+            }
         } label: {
             HStack(spacing: AppTheme.Spacing.xs) {
                 Image(systemName: selectedProvider.icon)
@@ -147,7 +153,11 @@ extension GenerationView {
                     Label("Add models…", systemImage: "plus")
                 }
             } else {
-                Label("FAL catalog preview", systemImage: "hammer")
+                Button {
+                    SettingsWindowController.shared.show(tab: .providers)
+                } label: {
+                    Label("Manage provider key…", systemImage: "key.horizontal")
+                }
             }
         } label: {
             HStack(spacing: AppTheme.Spacing.xs) {
