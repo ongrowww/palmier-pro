@@ -448,7 +448,6 @@ struct GenerationView: View {
 
     private var inputToolbar: some View {
         HStack(spacing: AppTheme.Spacing.sm) {
-            providerPicker
             modelPicker
             if showsFramesRefsPicker { framesRefsModePicker }
             if selectedType == .audio, audioModel.voices != nil {
@@ -461,7 +460,10 @@ struct GenerationView: View {
 
             Spacer(minLength: AppTheme.Spacing.xs)
 
-            costEstimateLabel
+            providerPicker
+            if selectedProvider == .palmierCloud {
+                costEstimateLabel
+            }
             submitButton
         }
         .frame(maxWidth: .infinity)

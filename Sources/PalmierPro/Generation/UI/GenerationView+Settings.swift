@@ -86,7 +86,7 @@ extension GenerationView {
                     .foregroundStyle(selectedProvider == .fal
                         ? AppTheme.Status.warningColor
                         : AppTheme.Text.tertiaryColor)
-                Text(selectedProvider.displayName)
+                Text(selectedProvider.toolbarDisplayName)
                     .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
                     .foregroundStyle(AppTheme.Text.secondaryColor)
                 Image(systemName: "chevron.down")

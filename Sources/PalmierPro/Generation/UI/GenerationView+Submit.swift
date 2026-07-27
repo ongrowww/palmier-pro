@@ -108,30 +108,16 @@ extension GenerationView {
     }
 
     var costEstimateLabel: some View {
-        Group {
-            if selectedProvider == .fal {
-                HStack(spacing: AppTheme.Spacing.xs) {
-                    Image(systemName: "key.horizontal.fill")
-                        .font(.system(size: AppTheme.FontSize.sm))
-                    Text("BYOK")
-                        .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
-                        .lineLimit(1)
-                }
-                .foregroundStyle(AppTheme.Status.warningColor)
-                .help("Billed through your fal.ai account. Cost estimation comes with provider integration.")
-            } else {
-                HStack(spacing: AppTheme.Spacing.xs) {
-                    Image(systemName: "dollarsign.circle.fill")
-                        .font(.system(size: AppTheme.FontSize.sm))
-                    Text(estimatedCost.map { $0.formatted() } ?? "—")
-                        .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                }
-                .foregroundStyle(hasInsufficientCredits ? .red : AppTheme.Text.secondaryColor)
-                .help(costHelpText)
-            }
+        HStack(spacing: AppTheme.Spacing.xs) {
+            Image(systemName: "dollarsign.circle.fill")
+                .font(.system(size: AppTheme.FontSize.sm))
+            Text(estimatedCost.map { $0.formatted() } ?? "—")
+                .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
+                .monospacedDigit()
+                .lineLimit(1)
         }
+        .foregroundStyle(hasInsufficientCredits ? .red : AppTheme.Text.secondaryColor)
+        .help(costHelpText)
     }
 
     @ViewBuilder

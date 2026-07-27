@@ -41,6 +41,7 @@ struct FALPreviewCatalogTests {
         }
 
         #expect(GenerationProvider.fal.displayName == "fal.ai")
+        #expect(GenerationProvider.fal.toolbarDisplayName == "fal.ai · BYOK")
         #expect(model?.entry.providerName == "Google")
     }
 }

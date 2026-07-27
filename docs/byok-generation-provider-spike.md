@@ -16,6 +16,11 @@ The provider is selected first. The existing Image, Video, Audio, and Upscale
 flows then display a provider-specific model catalog and reuse Palmier's
 capability-driven controls.
 
+The selector lives in the existing trailing action area of the prompt toolbar,
+next to credit estimation and submit/sign-in. This keeps Palmier's header
+available for project activity and close controls. The FAL label includes
+`BYOK`, so the separate credit-estimate position is hidden for that provider.
+
 The `fal.ai` submit button is deliberately disabled and marked as a preview.
 Selecting it cannot submit a request or spend credits.
 

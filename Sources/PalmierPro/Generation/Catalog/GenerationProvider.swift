@@ -13,6 +13,13 @@ enum GenerationProvider: String, CaseIterable, Identifiable {
         }
     }
 
+    var toolbarDisplayName: String {
+        switch self {
+        case .palmierCloud: displayName
+        case .fal: "\(displayName) · BYOK"
+        }
+    }
+
     var icon: String {
         switch self {
         case .palmierCloud: "cloud"
