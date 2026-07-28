@@ -125,7 +125,10 @@ struct FALQueueRequestBuilder {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
         guard components.count >= 2,
               components.allSatisfy({ component in
-                  !component.isEmpty && component.unicodeScalars.allSatisfy(allowed.contains)
+                  !component.isEmpty
+                      && component != "."
+                      && component != ".."
+                      && component.unicodeScalars.allSatisfy(allowed.contains)
               }) else {
             throw FALClientError.invalidEndpoint
         }
