@@ -156,17 +156,7 @@ struct GenerationView: View {
         .alert(item: $pendingFALConfirmation) { plan in
             Alert(
                 title: Text("Generate with fal.ai?"),
-                message: Text(
-                    "\(plan.modelName) · \(plan.isEditing ? "Edit" : "Generate") "
-                    + "\(plan.numImages) image\(plan.numImages == 1 ? "" : "s")"
-                    + (plan.isEditing
-                        ? " from \(plan.referenceCount) reference\(plan.referenceCount == 1 ? "" : "s")"
-                        : "")
-                    + "\n"
-                    + "Estimated charge: \(plan.estimatedCostLabel). "
-                    + "Input-dependent charges and fal.ai pricing may change; "
-                    + "your fal.ai account is billed directly."
-                ),
+                message: Text(plan.confirmationMessage),
                 primaryButton: .default(Text("Generate · \(plan.estimatedCostLabel)")) {
                     submitConfirmedFALImage(plan)
                 },

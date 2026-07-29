@@ -15,6 +15,18 @@ struct FALImageGenerationPlan: Identifiable, Sendable {
     var isEditing: Bool { !referenceFileURLs.isEmpty }
     var referenceCount: Int { referenceFileURLs.count }
 
+    var confirmationMessage: String {
+        let action = isEditing ? "Edit" : "Generate"
+        let imageLabel = "image\(numImages == 1 ? "" : "s")"
+        let referenceLabel = isEditing
+            ? " from \(referenceCount) reference\(referenceCount == 1 ? "" : "s")"
+            : ""
+        return "\(modelName) · \(action) \(numImages) \(imageLabel)\(referenceLabel)\n"
+            + "Estimated charge: \(estimatedCostLabel). "
+            + "Input-dependent charges and fal.ai pricing may change; "
+            + "your fal.ai account is billed directly."
+    }
+
     var estimatedCostLabel: String {
         (Double(estimatedCostMicroUSD) / 1_000_000).formatted(
             .currency(code: "USD").precision(.fractionLength(3))
