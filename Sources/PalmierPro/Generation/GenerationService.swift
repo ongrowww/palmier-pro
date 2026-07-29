@@ -163,9 +163,16 @@ final class GenerationService {
 
         Task { @MainActor in
             do {
+                var requestInput = plan.input
+                if !plan.referenceFileURLs.isEmpty {
+                    let dataURLs = try await Self.falReferenceDataURLs(
+                        for: plan.referenceFileURLs
+                    )
+                    requestInput["image_urls"] = .array(dataURLs.map(FALJSONValue.string))
+                }
                 let submission = try await falQueueClient.submit(
                     endpoint: plan.endpoint,
-                    input: plan.input
+                    input: requestInput
                 )
                 for placeholder in placeholders {
                     updateGenerationMetadata(placeholder, editor: editor, status: .generating) { input in
@@ -205,6 +212,36 @@ final class GenerationService {
         }
 
         return primaryId
+    }
+
+    @concurrent
+    private static func falReferenceDataURLs(for sourceURLs: [URL]) async throws -> [String] {
+        var results: [String] = []
+        results.reserveCapacity(sourceURLs.count)
+
+        for sourceURL in sourceURLs {
+            try Task.checkCancellation()
+            let supportedDirectly = ["jpg", "jpeg", "png", "webp"]
+                .contains(sourceURL.pathExtension.lowercased())
+            let preparedURL = supportedDirectly
+                ? sourceURL
+                : try await ImageConverter.convertToJPEG(sourceURL)
+            defer {
+                if preparedURL != sourceURL {
+                    try? FileManager.default.removeItem(at: preparedURL)
+                }
+            }
+            do {
+                let data = try Data(contentsOf: preparedURL, options: .mappedIfSafe)
+                let contentType = contentType(for: preparedURL, fallback: .image)
+                results.append("data:\(contentType);base64,\(data.base64EncodedString())")
+            } catch {
+                throw FALImageGenerationError.unreadableReference(
+                    sourceURL.lastPathComponent
+                )
+            }
+        }
+        return results
     }
 
     private func prepareReferences(
@@ -552,7 +589,7 @@ final class GenerationService {
         asset.cachedRemoteURLExpiresAt = Date().addingTimeInterval(uploadCacheTTL)
     }
 
-    private static func contentType(for url: URL, fallback: ClipType) -> String {
+    private nonisolated static func contentType(for url: URL, fallback: ClipType) -> String {
         switch url.pathExtension.lowercased() {
         case "jpg", "jpeg": return "image/jpeg"
         case "png": return "image/png"

@@ -55,7 +55,7 @@ struct FALPreviewCatalogTests {
             "openai/gpt-image-2",
             "fal-ai/flux-2",
         ])
-        #expect(models.allSatisfy { !$0.supportsImageReference })
+        #expect(models.allSatisfy(\.supportsImageReference))
     }
 
     @Test func fallsBackToFALWhenPalmierCloudIsUnavailable() {

@@ -70,6 +70,61 @@ struct FALImageGenerationPlanTests {
         ) == 7_078)
     }
 
+    @Test func mapsReferenceImagesToEditEndpoints() throws {
+        let references = [
+            "data:image/jpeg;base64,b25l",
+            "data:image/png;base64,dHdv",
+        ]
+        let nanoInput = try FALImageGenerationPlanner.requestInput(
+            modelId: "fal-ai/nano-banana-2",
+            prompt: "Combine these references",
+            aspectRatio: "1:1",
+            resolution: "1K",
+            quality: nil,
+            numImages: 1,
+            isEditing: true,
+            referenceURLs: references
+        )
+
+        #expect(nanoInput["image_urls"] == .array(references.map(FALJSONValue.string)))
+        #expect(FALImageGenerationPlanner.endpoint(
+            modelId: "fal-ai/nano-banana-2",
+            isEditing: true
+        ) == "fal-ai/nano-banana-2/edit")
+        #expect(FALImageGenerationPlanner.endpoint(
+            modelId: "openai/gpt-image-2",
+            isEditing: true
+        ) == "openai/gpt-image-2/edit")
+        #expect(FALImageGenerationPlanner.endpoint(
+            modelId: "fal-ai/flux-2",
+            isEditing: true
+        ) == "fal-ai/flux-2/edit")
+    }
+
+    @Test func usesGPTImageEditPricingWhenReferencesArePresent() throws {
+        #expect(try FALImageGenerationPlanner.estimatedCostMicroUSD(
+            modelId: "openai/gpt-image-2",
+            aspectRatio: "1:1",
+            resolution: "1024x1024",
+            quality: "high",
+            numImages: 1,
+            referenceCount: 1
+        ) == 219_000)
+    }
+
+    @Test func enforcesPublishedReferenceLimits() throws {
+        #expect(throws: FALImageGenerationError.tooManyReferences(maximum: 4)) {
+            try FALImageGenerationPlanner.validateReferenceCount(
+                modelId: "fal-ai/flux-2",
+                count: 5
+            )
+        }
+        try FALImageGenerationPlanner.validateReferenceCount(
+            modelId: "fal-ai/nano-banana-2",
+            count: 14
+        )
+    }
+
     @Test func rejectsUnsupportedCountsAndSettings() {
         #expect(throws: FALImageGenerationError.invalidImageCount) {
             try FALImageGenerationPlanner.requestInput(

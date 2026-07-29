@@ -7,9 +7,13 @@ struct FALImageGenerationPlan: Identifiable, Sendable {
     let input: [String: FALJSONValue]
     let generationInput: GenerationInput
     let numImages: Int
+    let referenceFileURLs: [URL]
     let estimatedCostMicroUSD: Int
     let folderId: String?
     let replacementClipId: String?
+
+    var isEditing: Bool { !referenceFileURLs.isEmpty }
+    var referenceCount: Int { referenceFileURLs.count }
 
     var estimatedCostLabel: String {
         (Double(estimatedCostMicroUSD) / 1_000_000).formatted(
@@ -30,6 +34,7 @@ enum FALImageGenerationPlanner {
         generationInput: GenerationInput,
         model: ImageModelConfig,
         numImages: Int,
+        references: [MediaAsset],
         folderId: String?,
         replacementClipId: String?
     ) throws -> FALImageGenerationPlan {
@@ -42,21 +47,25 @@ enum FALImageGenerationPlanner {
             aspectRatio: generationInput.aspectRatio,
             resolution: generationInput.resolution,
             quality: generationInput.quality,
-            numImages: numImages
+            numImages: numImages,
+            isEditing: !references.isEmpty
         )
         let cost = try estimatedCostMicroUSD(
             modelId: model.id,
             aspectRatio: generationInput.aspectRatio,
             resolution: generationInput.resolution,
             quality: generationInput.quality,
-            numImages: numImages
+            numImages: numImages,
+            referenceCount: references.count
         )
+        try validateReferenceCount(modelId: model.id, count: references.count)
         return FALImageGenerationPlan(
-            endpoint: model.id,
+            endpoint: endpoint(modelId: model.id, isEditing: !references.isEmpty),
             modelName: model.displayName,
             input: input,
             generationInput: generationInput,
             numImages: numImages,
+            referenceFileURLs: references.map(\.url),
             estimatedCostMicroUSD: cost,
             folderId: folderId,
             replacementClipId: replacementClipId
@@ -69,7 +78,9 @@ enum FALImageGenerationPlanner {
         aspectRatio: String,
         resolution: String?,
         quality: String?,
-        numImages: Int
+        numImages: Int,
+        isEditing: Bool = false,
+        referenceURLs: [String] = []
     ) throws -> [String: FALJSONValue] {
         guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw FALImageGenerationError.emptyPrompt
@@ -83,7 +94,7 @@ enum FALImageGenerationPlanner {
             guard let resolution, ["0.5K", "1K", "2K", "4K"].contains(resolution) else {
                 throw FALImageGenerationError.invalidSettings
             }
-            return [
+            var input: [String: FALJSONValue] = [
                 "prompt": .string(prompt),
                 "num_images": .number(Double(numImages)),
                 "aspect_ratio": .string(aspectRatio),
@@ -92,6 +103,10 @@ enum FALImageGenerationPlanner {
                 "limit_generations": .bool(true),
                 "enable_web_search": .bool(false),
             ]
+            if isEditing {
+                input["image_urls"] = .array(referenceURLs.map(FALJSONValue.string))
+            }
+            return input
         case "openai/gpt-image-2":
             guard let resolution,
                   let dimensions = ImageModelConfig.parseWxH(resolution),
@@ -99,7 +114,7 @@ enum FALImageGenerationPlanner {
                   ["low", "medium", "high"].contains(quality) else {
                 throw FALImageGenerationError.invalidSettings
             }
-            return [
+            var input: [String: FALJSONValue] = [
                 "prompt": .string(prompt),
                 "image_size": .object([
                     "width": .number(Double(dimensions.0)),
@@ -109,8 +124,12 @@ enum FALImageGenerationPlanner {
                 "num_images": .number(Double(numImages)),
                 "output_format": .string("jpeg"),
             ]
+            if isEditing {
+                input["image_urls"] = .array(referenceURLs.map(FALJSONValue.string))
+            }
+            return input
         case "fal-ai/flux-2":
-            return [
+            var input: [String: FALJSONValue] = [
                 "prompt": .string(prompt),
                 "image_size": .string(try fluxImageSize(for: aspectRatio)),
                 "num_images": .number(Double(numImages)),
@@ -118,6 +137,10 @@ enum FALImageGenerationPlanner {
                 "enable_safety_checker": .bool(true),
                 "output_format": .string("jpeg"),
             ]
+            if isEditing {
+                input["image_urls"] = .array(referenceURLs.map(FALJSONValue.string))
+            }
+            return input
         default:
             throw FALImageGenerationError.unsupportedModel
         }
@@ -128,7 +151,8 @@ enum FALImageGenerationPlanner {
         aspectRatio: String,
         resolution: String?,
         quality: String?,
-        numImages: Int
+        numImages: Int,
+        referenceCount: Int = 0
     ) throws -> Int {
         guard (1...4).contains(numImages) else {
             throw FALImageGenerationError.invalidImageCount
@@ -147,7 +171,11 @@ enum FALImageGenerationPlanner {
             guard let resolution, let quality else {
                 throw FALImageGenerationError.invalidSettings
             }
-            perImage = try gptImageCost(resolution: resolution, quality: quality)
+            perImage = try gptImageCost(
+                resolution: resolution,
+                quality: quality,
+                isEditing: referenceCount > 0
+            )
         case "fal-ai/flux-2":
             let pixels = try fluxPixelCount(for: aspectRatio)
             perImage = Int(ceil(Double(pixels) / 1_000_000 * 12_000))
@@ -157,8 +185,33 @@ enum FALImageGenerationPlanner {
         return perImage * numImages
     }
 
-    private static func gptImageCost(resolution: String, quality: String) throws -> Int {
-        let values: [String: [String: Int]] = [
+    static func endpoint(modelId: String, isEditing: Bool) -> String {
+        isEditing ? "\(modelId)/edit" : modelId
+    }
+
+    static func referenceLimit(modelId: String) -> Int {
+        switch modelId {
+        case "fal-ai/nano-banana-2": 14
+        case "openai/gpt-image-2": 16
+        case "fal-ai/flux-2": 4
+        default: 0
+        }
+    }
+
+    static func validateReferenceCount(modelId: String, count: Int) throws {
+        guard count >= 0, count <= referenceLimit(modelId: modelId) else {
+            throw FALImageGenerationError.tooManyReferences(
+                maximum: referenceLimit(modelId: modelId)
+            )
+        }
+    }
+
+    private static func gptImageCost(
+        resolution: String,
+        quality: String,
+        isEditing: Bool
+    ) throws -> Int {
+        let generationValues: [String: [String: Int]] = [
             "1024x768": ["low": 5_000, "medium": 37_000, "high": 145_000],
             "1024x1024": ["low": 6_000, "medium": 53_000, "high": 211_000],
             "1024x1536": ["low": 5_000, "medium": 42_000, "high": 165_000],
@@ -167,6 +220,16 @@ enum FALImageGenerationPlanner {
             "2560x1440": ["low": 7_000, "medium": 56_000, "high": 222_000],
             "3840x2160": ["low": 12_000, "medium": 101_000, "high": 401_000],
         ]
+        let editValues: [String: [String: Int]] = [
+            "1024x768": ["low": 11_000, "medium": 43_000, "high": 151_000],
+            "1024x1024": ["low": 15_000, "medium": 61_000, "high": 219_000],
+            "1024x1536": ["low": 18_000, "medium": 54_000, "high": 178_000],
+            "1536x1024": ["low": 18_000, "medium": 54_000, "high": 178_000],
+            "1920x1080": ["low": 17_000, "medium": 53_000, "high": 158_000],
+            "2560x1440": ["low": 19_000, "medium": 68_000, "high": 234_000],
+            "3840x2160": ["low": 24_000, "medium": 113_000, "high": 413_000],
+        ]
+        let values = isEditing ? editValues : generationValues
         guard let cost = values[resolution]?[quality] else {
             throw FALImageGenerationError.invalidSettings
         }
@@ -201,6 +264,8 @@ enum FALImageGenerationError: LocalizedError, Equatable {
     case unsupportedModel
     case missingImages
     case timedOut
+    case tooManyReferences(maximum: Int)
+    case unreadableReference(String)
 
     var errorDescription: String? {
         switch self {
@@ -210,6 +275,10 @@ enum FALImageGenerationError: LocalizedError, Equatable {
         case .unsupportedModel: "This fal.ai model is not connected yet."
         case .missingImages: "fal.ai returned no image URLs."
         case .timedOut: "fal.ai generation timed out."
+        case .tooManyReferences(let maximum):
+            "This fal.ai model accepts at most \(maximum) reference images."
+        case .unreadableReference(let filename):
+            "Could not prepare reference image \(filename) for fal.ai."
         }
     }
 }

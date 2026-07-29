@@ -289,9 +289,17 @@ extension GenerationView {
 
     var imageReferenceStrip: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-            Text("References")
-                .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
-                .foregroundStyle(AppTheme.Text.tertiaryColor)
+            HStack(spacing: AppTheme.Spacing.xs) {
+                Text("References")
+                    .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
+                    .foregroundStyle(AppTheme.Text.tertiaryColor)
+                if selectedProvider == .fal {
+                    Text("\(imageReferences.count)/\(FALImageGenerationPlanner.referenceLimit(modelId: imageModel.id))")
+                        .font(.system(size: AppTheme.FontSize.xs))
+                        .monospacedDigit()
+                        .foregroundStyle(AppTheme.Text.mutedColor)
+                }
+            }
 
             LazyVGrid(
                 columns: refGridColumns,
@@ -303,17 +311,20 @@ extension GenerationView {
                         imageReferences.removeAll { $0.id == asset.id }
                     }
                 }
-                RefDropZone(
-                    isTargeted: $imageRefTargeted,
-                    accepting: Set(ClipType.allCases),
-                    iconName: "photo.badge.plus"
-                ) { asset in
-                    if asset.type != .image {
-                        flashDropError("Drop image here.")
-                    } else if imageReferences.contains(where: { $0.id == asset.id }) {
-                        flashDropError("\(asset.name) is already a reference")
-                    } else {
-                        imageReferences.append(asset)
+                let falLimit = FALImageGenerationPlanner.referenceLimit(modelId: imageModel.id)
+                if selectedProvider != .fal || imageReferences.count < falLimit {
+                    RefDropZone(
+                        isTargeted: $imageRefTargeted,
+                        accepting: Set(ClipType.allCases),
+                        iconName: "photo.badge.plus"
+                    ) { asset in
+                        if asset.type != .image {
+                            flashDropError("Drop image here.")
+                        } else if imageReferences.contains(where: { $0.id == asset.id }) {
+                            flashDropError("\(asset.name) is already a reference")
+                        } else {
+                            imageReferences.append(asset)
+                        }
                     }
                 }
             }

@@ -38,7 +38,7 @@ struct FALPreviewCatalog {
             resolutions: ["0.5K", "1K", "2K", "4K"],
             aspectRatios: commonImageAspectRatios,
             qualities: nil,
-            supportsReferences: false,
+            supportsReferences: true,
             maxImages: 4
         ),
         image(
@@ -52,7 +52,7 @@ struct FALPreviewCatalog {
             ],
             aspectRatios: [],
             qualities: ["low", "medium", "high"],
-            supportsReferences: false,
+            supportsReferences: true,
             maxImages: 4
         ),
         image(
@@ -63,7 +63,7 @@ struct FALPreviewCatalog {
             resolutions: nil,
             aspectRatios: ["16:9", "4:3", "1:1", "3:4", "9:16"],
             qualities: nil,
-            supportsReferences: false,
+            supportsReferences: true,
             maxImages: 4
         ),
         video(

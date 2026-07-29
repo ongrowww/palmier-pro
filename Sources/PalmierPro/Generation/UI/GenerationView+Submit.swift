@@ -107,7 +107,8 @@ extension GenerationView {
             aspectRatio: selectedAspectRatio,
             resolution: effectiveResolution,
             quality: imageModel.qualities != nil ? selectedQuality : nil,
-            numImages: imageCount
+            numImages: imageCount,
+            referenceCount: imageReferences.count
         )
     }
 
@@ -119,7 +120,9 @@ extension GenerationView {
             let label = (Double(cost) / 1_000_000).formatted(
                 .currency(code: "USD").precision(.fractionLength(3))
             )
-            return "\(label) estimated. Your fal.ai account is billed directly; pricing may change."
+            let referenceNote = imageReferences.isEmpty
+                ? "" : " Reference inputs may add usage-based charges."
+            return "\(label) estimated.\(referenceNote) Your fal.ai account is billed directly; pricing may change."
         }
         guard let cost = estimatedCost else {
             return "Estimated cost. Actual billing may differ slightly."
@@ -223,11 +226,6 @@ extension GenerationView {
             flashDropError(error)
             return
         }
-        guard imageReferences.isEmpty else {
-            flashDropError("Image references are not connected to fal.ai yet.")
-            return
-        }
-
         let imageCount = imageModel.maxImages > 1
             ? min(imageModel.maxImages, max(1, selectedNumImages)) : 1
         var input = GenerationInput(
@@ -240,14 +238,21 @@ extension GenerationView {
             numImages: imageCount > 1 ? imageCount : nil
         )
         input.generationProvider = GenerationProvider.fal.rawValue
-        input.backendEndpoint = imageModel.id
+        input.backendEndpoint = FALImageGenerationPlanner.endpoint(
+            modelId: imageModel.id,
+            isEditing: !imageReferences.isEmpty
+        )
+        input.imageURLAssetIds = imageReferences.isEmpty ? nil : imageReferences.map(\.id)
 
         do {
             pendingFALConfirmation = try FALImageGenerationPlanner.makePlan(
                 generationInput: input,
                 model: imageModel,
                 numImages: imageCount,
-                folderId: editFolderId ?? editor.mediaPanelCurrentFolderId,
+                references: imageReferences,
+                folderId: editFolderId
+                    ?? imageReferences.last?.folderId
+                    ?? editor.mediaPanelCurrentFolderId,
                 replacementClipId: editor.pendingEditReplacementClipId
             )
         } catch {
@@ -616,29 +621,39 @@ extension GenerationView {
     }
 
     private func populatePanel(asset: MediaAsset, stored: GenerationInput) {
-        switch ModelRegistry.byId[stored.model] {
-        case .video:
-            guard let idx = videoModels.firstIndex(where: { $0.id == stored.model }) else { return }
+        if stored.generationProvider == GenerationProvider.fal.rawValue {
+            guard let idx = FALPreviewCatalog.shared.image.firstIndex(where: {
+                $0.id == stored.model
+            }) else { return }
             isPopulatingPanel = true
-            selectedType = .video
-            selectedVideoModelIndex = idx
-        case .image:
-            guard let idx = imageModels.firstIndex(where: { $0.id == stored.model }) else { return }
-            isPopulatingPanel = true
+            selectedProvider = .fal
             selectedType = .image
             selectedImageModelIndex = idx
-        case .audio:
-            guard let idx = audioModels.firstIndex(where: { $0.id == stored.model }) else { return }
-            isPopulatingPanel = true
-            selectedType = .audio
-            selectedAudioModelIndex = idx
-        case .upscale:
-            guard let idx = upscaleModels.firstIndex(where: { $0.id == stored.model }) else { return }
-            isPopulatingPanel = true
-            selectedType = .upscale
-            selectedUpscaleModelIndex = idx
-        case .none:
-            return
+        } else {
+            switch ModelRegistry.byId[stored.model] {
+            case .video:
+                guard let idx = videoModels.firstIndex(where: { $0.id == stored.model }) else { return }
+                isPopulatingPanel = true
+                selectedType = .video
+                selectedVideoModelIndex = idx
+            case .image:
+                guard let idx = imageModels.firstIndex(where: { $0.id == stored.model }) else { return }
+                isPopulatingPanel = true
+                selectedType = .image
+                selectedImageModelIndex = idx
+            case .audio:
+                guard let idx = audioModels.firstIndex(where: { $0.id == stored.model }) else { return }
+                isPopulatingPanel = true
+                selectedType = .audio
+                selectedAudioModelIndex = idx
+            case .upscale:
+                guard let idx = upscaleModels.firstIndex(where: { $0.id == stored.model }) else { return }
+                isPopulatingPanel = true
+                selectedType = .upscale
+                selectedUpscaleModelIndex = idx
+            case .none:
+                return
+            }
         }
         defer { DispatchQueue.main.async { isPopulatingPanel = false } }
 
