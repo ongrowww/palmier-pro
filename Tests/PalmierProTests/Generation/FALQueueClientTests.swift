@@ -83,4 +83,22 @@ struct FALQueueClientTests {
         #expect(submission.requestId == "req-123")
         #expect(submission.statusURL.host == "queue.fal.run")
     }
+
+    @Test func reconstructsTrustedQueueMetadataForResume() throws {
+        let submission = try FALQueueRequestBuilder.submission(
+            endpoint: "fal-ai/nano-banana-2",
+            requestId: "req-123"
+        )
+
+        #expect(submission.statusURL.absoluteString
+            == "https://queue.fal.run/fal-ai/nano-banana-2/requests/req-123/status")
+        #expect(submission.responseURL.absoluteString
+            == "https://queue.fal.run/fal-ai/nano-banana-2/requests/req-123")
+        #expect(throws: FALClientError.invalidResponse) {
+            try FALQueueRequestBuilder.submission(
+                endpoint: "fal-ai/nano-banana-2",
+                requestId: "../outside"
+            )
+        }
+    }
 }

@@ -73,6 +73,7 @@ struct GenerationView: View {
 
     @State var dropError: String? = nil
     @State var dropErrorTask: Task<Void, Never>? = nil
+    @State var pendingFALConfirmation: FALImageGenerationPlan? = nil
 
     @AppStorage("generationPromptExtra") private var promptExtra: Double = 0
     @State private var liveExtra: Double?
@@ -151,6 +152,20 @@ struct GenerationView: View {
         }
         .onChange(of: upscaleModels.isEmpty) { _, isEmpty in
             if isEmpty && selectedType == .upscale { selectedType = .video }
+        }
+        .alert(item: $pendingFALConfirmation) { plan in
+            Alert(
+                title: Text("Generate with fal.ai?"),
+                message: Text(
+                    "\(plan.modelName) · \(plan.numImages) image\(plan.numImages == 1 ? "" : "s")\n"
+                    + "Estimated charge: \(plan.estimatedCostLabel). "
+                    + "fal.ai pricing may change; your fal.ai account is billed directly."
+                ),
+                primaryButton: .default(Text("Generate · \(plan.estimatedCostLabel)")) {
+                    submitConfirmedFALImage(plan)
+                },
+                secondaryButton: .cancel()
+            )
         }
     }
 
@@ -463,9 +478,7 @@ struct GenerationView: View {
             Spacer(minLength: AppTheme.Spacing.xs)
 
             providerPicker
-            if selectedProvider == .palmierCloud {
-                costEstimateLabel
-            }
+            costEstimateLabel
             submitButton
         }
         .frame(maxWidth: .infinity)

@@ -94,7 +94,33 @@ extension GenerationView {
         return left > 0
     }
 
+    private var estimatedFALCostMicroUSD: Int? {
+        guard selectedProvider == .fal,
+              selectedType == .image,
+              FALImageGenerationPlanner.supportedModelIds.contains(imageModel.id) else {
+            return nil
+        }
+        let imageCount = imageModel.maxImages > 1
+            ? min(imageModel.maxImages, max(1, selectedNumImages)) : 1
+        return try? FALImageGenerationPlanner.estimatedCostMicroUSD(
+            modelId: imageModel.id,
+            aspectRatio: selectedAspectRatio,
+            resolution: effectiveResolution,
+            quality: imageModel.qualities != nil ? selectedQuality : nil,
+            numImages: imageCount
+        )
+    }
+
     private var costHelpText: String {
+        if selectedProvider == .fal {
+            guard let cost = estimatedFALCostMicroUSD else {
+                return "This fal.ai model is not connected yet."
+            }
+            let label = (Double(cost) / 1_000_000).formatted(
+                .currency(code: "USD").precision(.fractionLength(3))
+            )
+            return "\(label) estimated. Your fal.ai account is billed directly; pricing may change."
+        }
         guard let cost = estimatedCost else {
             return "Estimated cost. Actual billing may differ slightly."
         }
@@ -111,7 +137,7 @@ extension GenerationView {
         HStack(spacing: AppTheme.Spacing.xs) {
             Image(systemName: "dollarsign.circle.fill")
                 .font(.system(size: AppTheme.FontSize.sm))
-            Text(estimatedCost.map { $0.formatted() } ?? "—")
+            Text(costEstimateText)
                 .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
                 .monospacedDigit()
                 .lineLimit(1)
@@ -120,15 +146,28 @@ extension GenerationView {
         .help(costHelpText)
     }
 
+    private var costEstimateText: String {
+        if selectedProvider == .fal {
+            guard let cost = estimatedFALCostMicroUSD else { return "—" }
+            return (Double(cost) / 1_000_000).formatted(
+                .currency(code: "USD").precision(.fractionLength(3))
+            )
+        }
+        return estimatedCost.map { $0.formatted() } ?? "—"
+    }
+
     @ViewBuilder
     var submitButton: some View {
         if selectedProvider == .fal {
             Button {
                 if !falCredentials.hasKey {
                     SettingsWindowController.shared.show(tab: .providers)
+                } else if selectedType == .image {
+                    prepareFALGeneration()
                 }
             } label: {
-                Image(systemName: falCredentials.hasKey ? "hammer.fill" : "key.horizontal")
+                Image(systemName: falCredentials.hasKey && selectedType == .image
+                    ? "arrow.up" : falCredentials.hasKey ? "hammer.fill" : "key.horizontal")
                     .font(.system(size: AppTheme.FontSize.sm, weight: .bold))
                     .frame(width: AppTheme.IconSize.sm, height: AppTheme.IconSize.sm)
             }
@@ -136,12 +175,20 @@ extension GenerationView {
             .buttonBorderShape(.circle)
             .controlSize(.regular)
             .tint(AppTheme.Accent.primary)
-            .disabled(falCredentials.hasKey)
-            .opacity(falCredentials.hasKey ? AppTheme.Opacity.strong : AppTheme.Opacity.opaque)
-            .accessibilityLabel(falCredentials.hasKey ? "FAL integration preview" : "Add FAL API key")
-            .help(falCredentials.hasKey
-                ? "Queue transport is ready. Model mapping and cost confirmation are not connected yet."
-                : "Add a fal.ai API key in Settings.")
+            .disabled(falCredentials.hasKey && (selectedType != .image || !canSubmit))
+            .opacity(
+                falCredentials.hasKey && (selectedType != .image || !canSubmit)
+                    ? AppTheme.Opacity.strong : AppTheme.Opacity.opaque
+            )
+            .accessibilityLabel(
+                !falCredentials.hasKey ? "Add FAL API key"
+                    : selectedType == .image ? "Generate with fal.ai" : "FAL integration preview"
+            )
+            .help(
+                !falCredentials.hasKey ? "Add a fal.ai API key in Settings."
+                    : selectedType == .image ? "Review estimated fal.ai cost and generate."
+                    : "This fal.ai media type is not connected yet."
+            )
         } else {
             Button {
                 if aiAllowed { submitGeneration() }
@@ -165,6 +212,89 @@ extension GenerationView {
     }
 
     // MARK: - Actions
+
+    private func prepareFALGeneration() {
+        guard selectedProvider == .fal, selectedType == .image else { return }
+        guard falCredentials.hasKey else {
+            SettingsWindowController.shared.show(tab: .providers)
+            return
+        }
+        if let error = preflightValidation(audioDuration: 0) {
+            flashDropError(error)
+            return
+        }
+        guard imageReferences.isEmpty else {
+            flashDropError("Image references are not connected to fal.ai yet.")
+            return
+        }
+
+        let imageCount = imageModel.maxImages > 1
+            ? min(imageModel.maxImages, max(1, selectedNumImages)) : 1
+        var input = GenerationInput(
+            prompt: prompt,
+            model: imageModel.id,
+            duration: 0,
+            aspectRatio: selectedAspectRatio,
+            resolution: effectiveResolution,
+            quality: imageModel.qualities != nil ? selectedQuality : nil,
+            numImages: imageCount > 1 ? imageCount : nil
+        )
+        input.generationProvider = GenerationProvider.fal.rawValue
+        input.backendEndpoint = imageModel.id
+
+        do {
+            pendingFALConfirmation = try FALImageGenerationPlanner.makePlan(
+                generationInput: input,
+                model: imageModel,
+                numImages: imageCount,
+                folderId: editFolderId ?? editor.mediaPanelCurrentFolderId,
+                replacementClipId: editor.pendingEditReplacementClipId
+            )
+        } catch {
+            flashDropError(error.localizedDescription)
+        }
+    }
+
+    func submitConfirmedFALImage(_ plan: FALImageGenerationPlan) {
+        let editorRef = editor
+        if let clipId = plan.replacementClipId {
+            editor.markPendingReplacement(clipId: clipId)
+        }
+        let onComplete: (@MainActor (MediaAsset) -> Void)? = {
+            guard let clipId = plan.replacementClipId else { return nil }
+            let firstOnly = FirstOnlyFlag()
+            return { [weak editorRef] asset in
+                guard firstOnly.fire() else { return }
+                editorRef?.replaceClipMediaRef(
+                    clipId: clipId,
+                    newAssetId: asset.id,
+                    resetTrim: false
+                )
+                editorRef?.clearPendingReplacement(clipId: clipId)
+            }
+        }()
+        let onFailure: (@MainActor () -> Void)? = {
+            guard let clipId = plan.replacementClipId else { return nil }
+            return { [weak editorRef] in
+                editorRef?.clearPendingReplacement(clipId: clipId)
+            }
+        }()
+
+        let assetId = editor.generationService.generateFALImage(
+            plan: plan,
+            projectURL: editor.projectURL,
+            editor: editor,
+            onComplete: onComplete,
+            onFailure: onFailure
+        )
+        if plan.replacementClipId == nil {
+            editor.selectMediaPanelItem(assetId)
+        }
+        editor.clearPendingGenerationPanelState()
+        prompt = ""
+        editFolderId = nil
+        clearReferences()
+    }
 
     func videoInputAssets(for model: VideoModelConfig) -> VideoGenerationSubmission.InputAssets {
         if model.requiresSourceVideo {

@@ -45,6 +45,19 @@ struct FALPreviewCatalogTests {
         #expect(model?.entry.providerName == "Google")
     }
 
+    @Test func exposesTheFirstConnectedImageModels() {
+        let models = FALPreviewCatalog.shared.image.filter {
+            FALImageGenerationPlanner.supportedModelIds.contains($0.id)
+        }
+
+        #expect(Set(models.map(\.id)) == [
+            "fal-ai/nano-banana-2",
+            "openai/gpt-image-2",
+            "fal-ai/flux-2",
+        ])
+        #expect(models.allSatisfy { !$0.supportsReferences })
+    }
+
     @Test func fallsBackToFALWhenPalmierCloudIsUnavailable() {
         #expect(GenerationProvider.palmierCloud.isAvailable == BackendConfig.palmierCloudAvailable)
         if !BackendConfig.palmierCloudAvailable {

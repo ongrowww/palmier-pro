@@ -38,7 +38,7 @@ struct FALPreviewCatalog {
             resolutions: ["0.5K", "1K", "2K", "4K"],
             aspectRatios: commonImageAspectRatios,
             qualities: nil,
-            supportsReferences: true,
+            supportsReferences: false,
             maxImages: 4
         ),
         image(
@@ -46,10 +46,13 @@ struct FALPreviewCatalog {
             name: "GPT Image 2",
             vendor: "OpenAI",
             endpoints: ["openai/gpt-image-2", "openai/gpt-image-2/edit"],
-            resolutions: ["1024x1024", "1536x1024", "1024x1536"],
+            resolutions: [
+                "1024x768", "1024x1024", "1536x1024", "1024x1536",
+                "1920x1080", "2560x1440", "3840x2160",
+            ],
             aspectRatios: [],
             qualities: ["low", "medium", "high"],
-            supportsReferences: true,
+            supportsReferences: false,
             maxImages: 4
         ),
         image(
@@ -58,7 +61,7 @@ struct FALPreviewCatalog {
             vendor: "Black Forest Labs",
             endpoints: ["fal-ai/flux-2"],
             resolutions: nil,
-            aspectRatios: commonImageAspectRatios,
+            aspectRatios: ["16:9", "4:3", "1:1", "3:4", "9:16"],
             qualities: nil,
             supportsReferences: false,
             maxImages: 4

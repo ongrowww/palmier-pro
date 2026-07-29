@@ -75,6 +75,8 @@ struct GenerationInput: Codable, Sendable, Equatable {
     var referenceVideoAssetIds: [String]?
     var referenceAudioAssetIds: [String]?
     var createdAt: Date?
+    var generationProvider: String?
+    var backendEndpoint: String?
     var backendJobId: String?
     var outputIndex: Int?
     var resultURLs: [String]?

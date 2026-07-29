@@ -19,6 +19,7 @@ final class GenerationService {
 
     private static let uploadCacheTTL: TimeInterval = 6 * 24 * 60 * 60
     private var resumedBackendJobIds: Set<String> = []
+    private let falQueueClient = FALQueueClient()
 
     private struct PreparedReferences {
         let uploaded: [String]
@@ -117,6 +118,88 @@ final class GenerationService {
                 for placeholder in placeholders {
                     updateGenerationMetadata(placeholder, editor: editor, status: .failed("Upload failed: \(message)"))
                 }
+                onFailure?()
+            }
+        }
+
+        return primaryId
+    }
+
+    @discardableResult
+    func generateFALImage(
+        plan: FALImageGenerationPlan,
+        projectURL: URL?,
+        editor: EditorViewModel,
+        onComplete: (@MainActor (MediaAsset) -> Void)? = nil,
+        onFailure: (@MainActor () -> Void)? = nil
+    ) -> String {
+        let count = max(1, min(4, plan.numImages))
+        let baseName = String(plan.generationInput.prompt.prefix(30))
+        let resolvedFolderId = plan.folderId.flatMap { id in
+            editor.folder(id: id) != nil ? id : nil
+        }
+        let destination = Self.destinationDirectory(for: projectURL)
+        var placeholders: [MediaAsset] = []
+
+        for outputIndex in 0..<count {
+            var input = plan.generationInput
+            input.outputIndex = outputIndex
+            input.createdAt = input.createdAt ?? Date()
+            input.generationProvider = GenerationProvider.fal.rawValue
+            input.backendEndpoint = plan.endpoint
+            let placeholder = createPlaceholder(
+                type: .image,
+                name: baseName,
+                duration: Defaults.imageDurationSeconds,
+                genInput: input,
+                folderId: resolvedFolderId,
+                destDir: destination,
+                fileExtension: "jpg",
+                editor: editor
+            )
+            placeholders.append(placeholder)
+        }
+        let primaryId = placeholders[0].id
+
+        Task { @MainActor in
+            do {
+                let submission = try await falQueueClient.submit(
+                    endpoint: plan.endpoint,
+                    input: plan.input
+                )
+                for placeholder in placeholders {
+                    updateGenerationMetadata(placeholder, editor: editor, status: .generating) { input in
+                        input.backendJobId = submission.requestId
+                    }
+                }
+                editor.onProjectCheckpointRequired?()
+
+                let result = try await falQueueClient.waitForResult(submission)
+                let urls = try result.imageURLs()
+                await finalizeSuccess(
+                    urlStrings: urls,
+                    placeholders: placeholders,
+                    editor: editor,
+                    onComplete: onComplete,
+                    onFailure: onFailure
+                )
+            } catch is CancellationError {
+                for placeholder in placeholders {
+                    updateGenerationMetadata(
+                        placeholder,
+                        editor: editor,
+                        status: .failed("Generation cancelled")
+                    )
+                }
+                editor.onProjectCheckpointRequired?()
+                onFailure?()
+            } catch {
+                let message = error.localizedDescription
+                Log.generation.error("fal.ai image generation failed model=\(plan.endpoint) error=\(message)")
+                for placeholder in placeholders {
+                    updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
+                }
+                editor.onProjectCheckpointRequired?()
                 onFailure?()
             }
         }
@@ -289,7 +372,10 @@ final class GenerationService {
 
         let pending = editor.mediaAssets.filter(\.isRecoveringGeneration)
 
-        let byBackendJob = Dictionary(grouping: pending.compactMap { asset -> (String, MediaAsset)? in
+        let palmierPending = pending.filter {
+            $0.generationInput?.generationProvider != GenerationProvider.fal.rawValue
+        }
+        let byBackendJob = Dictionary(grouping: palmierPending.compactMap { asset -> (String, MediaAsset)? in
             guard let backendJobId = asset.generationInput?.backendJobId, !backendJobId.isEmpty else { return nil }
             return (backendJobId, asset)
         }, by: { $0.0 })
@@ -308,6 +394,78 @@ final class GenerationService {
                 )
                 self.resumedBackendJobIds.remove(backendJobId)
             }
+        }
+
+        let falPending = pending.filter {
+            $0.generationInput?.generationProvider == GenerationProvider.fal.rawValue
+        }
+        let byFALRequest = Dictionary(grouping: falPending.compactMap { asset -> (String, MediaAsset)? in
+            guard let input = asset.generationInput,
+                  let endpoint = input.backendEndpoint,
+                  let requestId = input.backendJobId,
+                  !endpoint.isEmpty,
+                  !requestId.isEmpty else { return nil }
+            return ("fal:\(endpoint):\(requestId)", asset)
+        }, by: { $0.0 })
+
+        for (resumeKey, group) in byFALRequest where !resumedBackendJobIds.contains(resumeKey) {
+            let placeholders = sorted(group.map { $0.1 })
+            guard let input = placeholders.first?.generationInput,
+                  let endpoint = input.backendEndpoint,
+                  let requestId = input.backendJobId else { continue }
+            do {
+                let submission = try FALQueueRequestBuilder.submission(
+                    endpoint: endpoint,
+                    requestId: requestId
+                )
+                resumedBackendJobIds.insert(resumeKey)
+                Task { @MainActor [weak self, weak editor] in
+                    guard let self, let editor else { return }
+                    await self.monitorFALImageJob(
+                        submission: submission,
+                        placeholders: placeholders,
+                        editor: editor,
+                        onComplete: nil,
+                        onFailure: nil
+                    )
+                    self.resumedBackendJobIds.remove(resumeKey)
+                }
+            } catch {
+                let message = "Cannot resume fal.ai generation: \(error.localizedDescription)"
+                for placeholder in placeholders {
+                    updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
+                }
+                editor.onProjectCheckpointRequired?()
+            }
+        }
+    }
+
+    private func monitorFALImageJob(
+        submission: FALQueueSubmission,
+        placeholders: [MediaAsset],
+        editor: EditorViewModel,
+        onComplete: (@MainActor (MediaAsset) -> Void)?,
+        onFailure: (@MainActor () -> Void)?
+    ) async {
+        do {
+            let result = try await falQueueClient.waitForResult(submission)
+            await finalizeSuccess(
+                urlStrings: try result.imageURLs(),
+                placeholders: placeholders,
+                editor: editor,
+                onComplete: onComplete,
+                onFailure: onFailure
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            let message = error.localizedDescription
+            Log.generation.error("fal.ai resume failed request=\(submission.requestId) error=\(message)")
+            for placeholder in placeholders {
+                updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
+            }
+            editor.onProjectCheckpointRequired?()
+            onFailure?()
         }
     }
 

@@ -36,6 +36,32 @@ enum FALJSONValue: Codable, Equatable, Sendable {
         case .null: try container.encodeNil()
         }
     }
+
+    var objectValue: [String: FALJSONValue]? {
+        guard case .object(let value) = self else { return nil }
+        return value
+    }
+
+    var arrayValue: [FALJSONValue]? {
+        guard case .array(let value) = self else { return nil }
+        return value
+    }
+
+    var stringValue: String? {
+        guard case .string(let value) = self else { return nil }
+        return value
+    }
+
+    func imageURLs() throws -> [String] {
+        guard let images = objectValue?["images"]?.arrayValue else {
+            throw FALImageGenerationError.missingImages
+        }
+        let urls = images.compactMap { $0.objectValue?["url"]?.stringValue }
+        guard !urls.isEmpty else {
+            throw FALImageGenerationError.missingImages
+        }
+        return urls
+    }
 }
 
 struct FALQueueSubmission: Decodable, Equatable, Sendable {
@@ -120,7 +146,22 @@ struct FALQueueRequestBuilder {
         return request
     }
 
-    private static func validatedEndpoint(_ endpoint: String) throws -> String {
+    static func submission(endpoint: String, requestId: String) throws -> FALQueueSubmission {
+        let endpoint = try validatedEndpoint(endpoint)
+        let requestId = try validatedRequestId(requestId)
+        let responseURL = queueBaseURL
+            .appending(path: endpoint)
+            .appending(path: "requests")
+            .appending(path: requestId)
+        return FALQueueSubmission(
+            requestId: requestId,
+            statusURL: responseURL.appending(path: "status"),
+            responseURL: responseURL,
+            cancelURL: responseURL.appending(path: "cancel")
+        )
+    }
+
+    static func validatedEndpoint(_ endpoint: String) throws -> String {
         let components = endpoint.split(separator: "/", omittingEmptySubsequences: false)
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
         guard components.count >= 2,
@@ -133,6 +174,17 @@ struct FALQueueRequestBuilder {
             throw FALClientError.invalidEndpoint
         }
         return components.joined(separator: "/")
+    }
+
+    private static func validatedRequestId(_ requestId: String) throws -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-"))
+        guard !requestId.isEmpty,
+              requestId != ".",
+              requestId != "..",
+              requestId.unicodeScalars.allSatisfy(allowed.contains) else {
+            throw FALClientError.invalidResponse
+        }
+        return requestId
     }
 }
 
@@ -160,6 +212,45 @@ actor FALQueueClient {
 
     func status(for submission: FALQueueSubmission) async throws -> FALQueueStatus {
         let apiKey = try await credentials.apiKey()
+        return try await status(for: submission, apiKey: apiKey)
+    }
+
+    func result(for submission: FALQueueSubmission) async throws -> FALJSONValue {
+        let apiKey = try await credentials.apiKey()
+        return try await result(for: submission, apiKey: apiKey)
+    }
+
+    func waitForResult(
+        _ submission: FALQueueSubmission,
+        maximumPollCount: Int = 1_800
+    ) async throws -> FALJSONValue {
+        let apiKey = try await credentials.apiKey()
+        do {
+            for _ in 0..<maximumPollCount {
+                try Task.checkCancellation()
+                let current = try await status(for: submission, apiKey: apiKey)
+                if current.status == .completed {
+                    return try await result(for: submission, apiKey: apiKey)
+                }
+                try await Task.sleep(for: .seconds(1))
+            }
+            try await cancel(submission, apiKey: apiKey)
+            throw FALImageGenerationError.timedOut
+        } catch is CancellationError {
+            try? await cancel(submission, apiKey: apiKey)
+            throw CancellationError()
+        }
+    }
+
+    func cancel(_ submission: FALQueueSubmission) async throws {
+        let apiKey = try await credentials.apiKey()
+        try await cancel(submission, apiKey: apiKey)
+    }
+
+    private func status(
+        for submission: FALQueueSubmission,
+        apiKey: String
+    ) async throws -> FALQueueStatus {
         let request = try FALQueueRequestBuilder.authenticatedRequest(
             url: submission.statusURL,
             method: "GET",
@@ -168,8 +259,10 @@ actor FALQueueClient {
         return try await perform(request, as: FALQueueStatus.self)
     }
 
-    func result(for submission: FALQueueSubmission) async throws -> FALJSONValue {
-        let apiKey = try await credentials.apiKey()
+    private func result(
+        for submission: FALQueueSubmission,
+        apiKey: String
+    ) async throws -> FALJSONValue {
         let request = try FALQueueRequestBuilder.authenticatedRequest(
             url: submission.responseURL,
             method: "GET",
@@ -178,8 +271,7 @@ actor FALQueueClient {
         return try await perform(request, as: FALJSONValue.self)
     }
 
-    func cancel(_ submission: FALQueueSubmission) async throws {
-        let apiKey = try await credentials.apiKey()
+    private func cancel(_ submission: FALQueueSubmission, apiKey: String) async throws {
         let request = try FALQueueRequestBuilder.authenticatedRequest(
             url: submission.cancelURL,
             method: "PUT",
