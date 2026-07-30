@@ -6,6 +6,7 @@ enum CodexAppServerError: LocalizedError, Sendable {
     case invalidJSON
     case malformedResponse
     case rpc(code: Int, message: String)
+    case timedOut
     case terminated
 
     var errorDescription: String? {
@@ -15,6 +16,7 @@ enum CodexAppServerError: LocalizedError, Sendable {
         case .invalidJSON: "Codex app-server returned invalid JSON."
         case .malformedResponse: "Codex app-server returned an incompatible response."
         case .rpc(let code, let message): "Codex app-server error \(code): \(message)"
+        case .timedOut: "Codex app-server did not respond in time."
         case .terminated: "Codex app-server stopped unexpectedly."
         }
     }
@@ -88,23 +90,21 @@ actor CodexAppServer: CodexAppServerServing {
             inputHandle = input.fileHandleForWriting
             stderrTail.removeAll(keepingCapacity: true)
 
-            stdoutTask = Task { [weak self] in
+            stdoutTask = Task.detached(priority: .utility) { [weak self] in
                 var buffer = CodexLineBuffer()
-                do {
-                    for try await byte in output.fileHandleForReading.bytes {
-                        let lines = buffer.append(Data([byte]))
-                        for line in lines { await self?.receive(line) }
-                    }
-                } catch {
-                    await self?.didTerminate()
+                while !Task.isCancelled {
+                    let chunk = output.fileHandleForReading.availableData
+                    guard !chunk.isEmpty else { break }
+                    let lines = buffer.append(chunk)
+                    for line in lines { await self?.receive(line) }
                 }
             }
-            stderrTask = Task { [weak self] in
-                do {
-                    for try await byte in errors.fileHandleForReading.bytes {
-                        await self?.appendStderr(Data([byte]))
-                    }
-                } catch {}
+            stderrTask = Task.detached(priority: .utility) { [weak self] in
+                while !Task.isCancelled {
+                    let chunk = errors.fileHandleForReading.availableData
+                    guard !chunk.isEmpty else { break }
+                    await self?.appendStderr(chunk)
+                }
             }
 
             _ = try await request(
@@ -131,6 +131,10 @@ actor CodexAppServer: CodexAppServerServing {
                 pending[id] = continuation
                 do {
                     try write(CodexRPCEnvelope(id: .number(id), method: method, params: params))
+                    Task { [weak self] in
+                        try? await Task.sleep(for: .seconds(20))
+                        await self?.timeoutRequest(id)
+                    }
                 } catch {
                     pending.removeValue(forKey: id)?.resume(throwing: error)
                 }
@@ -240,6 +244,10 @@ actor CodexAppServer: CodexAppServerServing {
 
     private func cancelRequest(_ id: Int) {
         pending.removeValue(forKey: id)?.resume(throwing: CancellationError())
+    }
+
+    private func timeoutRequest(_ id: Int) {
+        pending.removeValue(forKey: id)?.resume(throwing: CodexAppServerError.timedOut)
     }
 
     private func removeEventContinuation(_ id: UUID) {
