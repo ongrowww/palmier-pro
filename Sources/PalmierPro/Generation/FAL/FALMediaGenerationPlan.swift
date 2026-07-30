@@ -268,7 +268,6 @@ enum FALVideoGenerationPlanner {
         hasVideoReference: Bool = false
     ) throws -> Int {
         guard duration > 0 else { throw FALMediaGenerationError.invalidSettings }
-        let perSecond: Double
         switch modelId {
         case "bytedance/seedance-2.0/fast", "bytedance/seedance-2.0":
             guard let resolution else { throw FALMediaGenerationError.invalidSettings }
@@ -283,22 +282,21 @@ enum FALVideoGenerationPlanner {
                 (3840, 2160, 0.008)
             default: throw FALMediaGenerationError.invalidSettings
             }
-            perSecond = workload.width * workload.height * 24 / 1024 / 1000
+            let perSecond = workload.width * workload.height * 24 / 1024 / 1000
                 * workload.tokenRate
                 * (hasVideoReference ? 0.6 : 1)
+            return Int(ceil(perSecond * Double(duration) * 1_000_000))
         case "fal-ai/kling-video/v3/standard":
-            perSecond = generateAudio ? 0.126 : 0.084
+            return duration * (generateAudio ? 126_000 : 84_000)
         case "fal-ai/veo3.1":
             guard let resolution else { throw FALMediaGenerationError.invalidSettings }
             if resolution == "4k" {
-                perSecond = generateAudio ? 0.60 : 0.40
-            } else {
-                perSecond = generateAudio ? 0.40 : 0.20
+                return duration * (generateAudio ? 600_000 : 400_000)
             }
+            return duration * (generateAudio ? 400_000 : 200_000)
         default:
             throw FALMediaGenerationError.unsupportedModel
         }
-        return Int(ceil(perSecond * Double(duration) * 1_000_000))
     }
 
     private static func commonVideoInput(
