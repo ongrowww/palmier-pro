@@ -46,6 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !MLXRuntime.beginTermination() {
                     await MLXRuntime.waitUntilIdle()
                 }
+                for project in projects {
+                    project.editorViewModel.agentService.cancel()
+                }
+                await CodexAppServer.shared.shutdown()
                 sender.reply(toApplicationShouldTerminate: true)
             } catch {
                 projects.forEach { $0.editorViewModel.projectPackageCoordinator.cancelClosing() }

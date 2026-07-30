@@ -45,6 +45,7 @@ struct AgentPanelView: View {
 
     private var canSend: Bool {
         !service.isStreaming &&
+        service.pendingApproval == nil &&
         service.canStream &&
         !service.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -137,36 +138,138 @@ struct AgentPanelView: View {
     }
 
     @ViewBuilder
-    private var modelPicker: some View {
-        if service.hasApiKey {
+    private var providerControls: some View {
+        Menu {
+            ForEach(AgentProviderID.allCases, id: \.self) { provider in
+                Button(provider.displayName) { service.selectedProvider = provider }
+            }
+        } label: {
+            footerMenuLabel(service.selectedProvider.displayName)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(service.isStreaming || !(service.currentSessionCanChangeProvider))
+        .help(service.currentSessionCanChangeProvider
+              ? "Choose chat provider"
+              : "Start a new chat to change provider")
+
+        if service.selectedProvider == .palmier, service.hasApiKey {
             Menu {
                 ForEach(service.availableModels, id: \.self) { m in
                     Button(m.displayName) { service.model = m }
                 }
             } label: {
-                HStack(spacing: AppTheme.Spacing.xs) {
-                    Text(service.effectiveModel.displayName)
-                        .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
-                        .foregroundStyle(AppTheme.Text.secondaryColor)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: AppTheme.FontSize.micro, weight: .semibold))
-                        .foregroundStyle(AppTheme.Text.tertiaryColor)
-                }
+                footerMenuLabel(service.effectiveModel.displayName)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
+            .disabled(service.isStreaming)
+            .help("Choose Palmier model")
+        } else if service.selectedProvider == .codex {
+            codexControls
         }
     }
 
     @ViewBuilder
-    private var byokIndicator: some View {
-        if service.hasApiKey {
+    private var providerIndicator: some View {
+        if service.selectedProvider == .palmier, service.hasApiKey {
             Text("using API key")
                 .font(.system(size: AppTheme.FontSize.xs).italic())
                 .foregroundStyle(AppTheme.Text.tertiaryColor)
                 .help("Streaming through your Anthropic API key (BYOK)")
+        } else if service.selectedProvider == .codex, !service.codexAvailability.canSend {
+            Button(service.codexStatusText) {
+                SettingsWindowController.shared.show(tab: .agent)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: AppTheme.FontSize.xs))
+            .foregroundStyle(AppTheme.Text.tertiaryColor)
+            .help("Open Codex settings")
         }
+    }
+
+    @ViewBuilder
+    private var codexControls: some View {
+        if let model = service.selectedCodexModel {
+            Menu {
+                ForEach(service.codexCatalog.models) { option in
+                    Button(option.displayName) {
+                        var selection = service.codexSelection
+                        selection.modelID = option.id
+                        service.codexSelection = selection
+                    }
+                }
+            } label: {
+                footerMenuLabel(model.displayName)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .disabled(service.isStreaming)
+            .help("Choose Codex model")
+
+            if model.supportedReasoningEfforts.count > 1 {
+                Menu {
+                    ForEach(model.supportedReasoningEfforts, id: \.self) { effort in
+                        Button(effort.capitalized) {
+                            var selection = service.codexSelection
+                            selection.reasoningEffort = effort
+                            service.codexSelection = selection
+                        }
+                    }
+                } label: {
+                    footerMenuLabel(service.codexSelection.reasoningEffort?.capitalized ?? "Reasoning")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .disabled(service.isStreaming)
+                .help("Choose Codex reasoning effort")
+            }
+
+            if !model.supportedServiceTiers.isEmpty {
+                Menu {
+                    Button("Normal") {
+                        var selection = service.codexSelection
+                        selection.serviceTier = model.defaultServiceTier
+                        service.codexSelection = selection
+                    }
+                    ForEach(model.supportedServiceTiers) { tier in
+                        Button(tier.displayName) {
+                            var selection = service.codexSelection
+                            selection.serviceTier = tier.id
+                            service.codexSelection = selection
+                        }
+                        .help(tier.detail ?? tier.displayName)
+                    }
+                } label: {
+                    footerMenuLabel(selectedTierName(in: model))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .disabled(service.isStreaming)
+                .help("Choose Codex speed")
+            }
+        }
+    }
+
+    private func footerMenuLabel(_ text: String) -> some View {
+        HStack(spacing: AppTheme.Spacing.xs) {
+            Text(text)
+                .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
+                .foregroundStyle(AppTheme.Text.secondaryColor)
+            Image(systemName: "chevron.down")
+                .font(.system(size: AppTheme.FontSize.micro, weight: .semibold))
+                .foregroundStyle(AppTheme.Text.tertiaryColor)
+        }
+    }
+
+    private func selectedTierName(in model: AgentProviderModel) -> String {
+        guard let selected = service.codexSelection.serviceTier else { return "Normal" }
+        return model.supportedServiceTiers.first(where: { $0.id == selected })?.displayName ?? "Normal"
     }
 
     private var toolResults: [String: ToolRunResult] {
@@ -311,7 +414,11 @@ struct AgentPanelView: View {
                 }
             }
         } else {
-            missingKeyState
+            if service.selectedProvider == .palmier {
+                missingKeyState
+            } else {
+                codexUnavailableState
+            }
         }
     }
 
@@ -381,8 +488,15 @@ struct AgentPanelView: View {
     private var footer: some View {
         @Bindable var service = editor.agentService
         return VStack(spacing: AppTheme.Spacing.sm) {
+            if let approval = service.pendingApproval {
+                AgentApprovalView(request: approval, onDecision: service.resolveApproval)
+            }
             if !service.canStream && !service.messages.isEmpty {
-                missingKeyState
+                if service.selectedProvider == .palmier {
+                    missingKeyState
+                } else {
+                    codexUnavailableState
+                }
             }
             AgentInputBox(
                 draft: $service.draft,
@@ -392,8 +506,8 @@ struct AgentPanelView: View {
                 onSend: submit,
                 onCancel: { service.cancel() }
             ) {
-                modelPicker
-                byokIndicator
+                providerControls
+                providerIndicator
             }
         }
         .padding(.horizontal, AppTheme.Spacing.mdLg)
@@ -401,6 +515,14 @@ struct AgentPanelView: View {
         .padding(.top, AppTheme.Spacing.xs)
         .frame(maxWidth: Layout.chatColumnMax)
         .frame(maxWidth: .infinity)
+    }
+
+    private var codexUnavailableState: some View {
+        Button(service.codexStatusText) {
+            SettingsWindowController.shared.show(tab: .agent)
+        }
+        .buttonStyle(.capsule(.secondary))
+        .help("Open Codex settings")
     }
 
     private func submit() {

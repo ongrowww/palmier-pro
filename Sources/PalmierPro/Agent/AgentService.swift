@@ -39,6 +39,9 @@ final class AgentService {
     var hasApiKey: Bool { !apiKey.isEmpty }
 
     var canStream: Bool {
+        if selectedProvider == .codex {
+            return codexAvailability.canSend
+        }
         if hasApiKey { return true }
         let account = AccountService.shared
         return account.isSignedIn && account.hasCredits
@@ -79,6 +82,9 @@ final class AgentService {
     var messages: [AgentMessage] = []
     var isStreaming: Bool = false
     var streamError: PalmierClientError?
+    var codexAvailability: AgentProviderAvailability = .loading
+    var codexCatalog = AgentProviderCatalog(models: [])
+    var pendingApproval: AgentApprovalRequest?
     var onSessionsChanged: (@MainActor () -> Void)?
 
     var draft: String = ""
@@ -212,10 +218,85 @@ final class AgentService {
     }
 
     weak var editor: EditorViewModel? {
-        didSet { toolExecutor = editor.map { ToolExecutor(editor: $0) } }
+        didSet {
+            toolExecutor = editor.map { ToolExecutor(editor: $0) }
+            codexProvider = toolExecutor.map { CodexProvider(toolExecutor: $0) }
+            refreshCodex()
+        }
     }
     private var toolExecutor: ToolExecutor?
+    private var codexProvider: (any AgentProviderRuntime)?
     private var currentTask: Task<Void, Never>?
+
+    var selectedProvider: AgentProviderID {
+        get { currentSession?.provider ?? .palmier }
+        set {
+            guard let index = currentSessionIndex, sessions[index].canChangeProvider else { return }
+            sessions[index].provider = newValue
+            if newValue == .codex {
+                normalizeCodexSelection(at: index)
+                refreshCodex()
+            }
+            onSessionsChanged?()
+        }
+    }
+
+    var codexSelection: AgentProviderSelection {
+        get {
+            AgentProviderSelection(
+                modelID: currentSession?.selectedModelID,
+                reasoningEffort: currentSession?.selectedReasoningEffort,
+                serviceTier: currentSession?.selectedServiceTier
+            )
+        }
+        set {
+            guard let index = currentSessionIndex, !isStreaming else { return }
+            sessions[index].apply(codexCatalog.normalized(
+                modelID: newValue.modelID,
+                reasoningEffort: newValue.reasoningEffort,
+                serviceTier: newValue.serviceTier
+            ))
+            onSessionsChanged?()
+        }
+    }
+
+    var selectedCodexModel: AgentProviderModel? {
+        codexCatalog.models.first { $0.id == codexSelection.modelID }
+    }
+
+    private var currentSessionIndex: Int? {
+        guard let currentSessionId else { return nil }
+        return sessions.firstIndex { $0.id == currentSessionId }
+    }
+
+    private var currentSession: ChatSession? {
+        currentSessionIndex.map { sessions[$0] }
+    }
+
+    var currentSessionCanChangeProvider: Bool {
+        currentSession?.canChangeProvider ?? true
+    }
+
+    func refreshCodex() {
+        guard let codexProvider else { return }
+        Task { [weak self] in
+            await codexProvider.prepare()
+            guard let self else { return }
+            codexAvailability = codexProvider.availability
+            codexCatalog = codexProvider.catalog
+            if let index = currentSessionIndex { normalizeCodexSelection(at: index) }
+        }
+    }
+
+    private func normalizeCodexSelection(at index: Int) {
+        guard sessions.indices.contains(index), !codexCatalog.models.isEmpty else { return }
+        let selection = codexCatalog.normalized(
+            modelID: sessions[index].selectedModelID,
+            reasoningEffort: sessions[index].selectedReasoningEffort,
+            serviceTier: sessions[index].selectedServiceTier
+        )
+        sessions[index].apply(selection)
+    }
 
     func loadSessions(from projectURL: URL?) {
         sessions = ChatSessionStore.load(from: projectURL)
@@ -234,6 +315,7 @@ final class AgentService {
         draft = ""
         mentions.removeAll()
         streamError = nil
+        pendingApproval = nil
         toolExecutor?.resetFeedbackState()
     }
 
@@ -250,6 +332,7 @@ final class AgentService {
         currentSessionId = session.id
         messages = []
         streamError = nil
+        pendingApproval = nil
         toolExecutor?.resetFeedbackState()
         onSessionsChanged?()
     }
@@ -267,6 +350,7 @@ final class AgentService {
         currentSessionId = id
         messages = sessions[idx].messages
         streamError = nil
+        pendingApproval = nil
     }
 
     func closeTab(_ id: UUID) {
@@ -298,7 +382,11 @@ final class AgentService {
 
     func send(text: String, mentions: [AgentMention]) {
         guard canStream else {
-            streamError = .upstream("Sign in to a paid plan or add an Anthropic API key to start.")
+            streamError = .upstream(
+                selectedProvider == .codex
+                    ? codexStatusText
+                    : "Sign in to a paid plan or add an Anthropic API key to start."
+            )
             return
         }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -312,7 +400,7 @@ final class AgentService {
         )
         let analyticsPayload: [String: Any] = [
             "project_id": editor?.projectId ?? "unknown",
-            "model": effectiveModel.rawValue,
+            "provider": selectedProvider.rawValue,
         ]
         if sessionActivation.activate() {
             Analytics.capture(.agentSessionStarted, properties: analyticsPayload)
@@ -334,6 +422,12 @@ final class AgentService {
     }
 
     func cancel() {
+        if let pendingApproval {
+            Task { [weak self] in
+                await self?.codexProvider?.resolveApproval(id: pendingApproval.id, decision: .deny)
+            }
+        }
+        pendingApproval = nil
         currentTask?.cancel()
         currentTask = nil
         isStreaming = false
@@ -353,6 +447,10 @@ final class AgentService {
     }
 
     private func runLoop() async {
+        if selectedProvider == .codex {
+            await runCodexTurn()
+            return
+        }
         guard let client = selectClient() else {
             streamError = .upstream("No backend available.")
             return
@@ -407,6 +505,124 @@ final class AgentService {
                 streamError = .upstream(error.localizedDescription)
                 break loop
             }
+        }
+    }
+
+    private func runCodexTurn() async {
+        guard let provider = codexProvider,
+              let sessionID = currentSessionId,
+              let editor,
+              let projectURL = editor.projectURL else {
+            streamError = .upstream("Save the project before starting a Codex chat.")
+            return
+        }
+        if !codexAvailability.canSend {
+            await provider.prepare()
+            codexAvailability = provider.availability
+            codexCatalog = provider.catalog
+            if let refreshedIndex = sessions.firstIndex(where: { $0.id == sessionID }) {
+                normalizeCodexSelection(at: refreshedIndex)
+            }
+        }
+        guard codexAvailability.canSend else {
+            streamError = .upstream(codexStatusText)
+            return
+        }
+        guard currentSessionId == sessionID,
+              let sessionIndex = sessions.firstIndex(where: { $0.id == sessionID }) else {
+            return
+        }
+
+        await SkillStore.shared.reloadInBackground()
+        let message = messages.last { $0.role == .user }
+        let visibleText = message?.blocks.compactMap {
+            if case .text(let text) = $0 { return text }
+            return nil
+        }.joined(separator: "\n") ?? ""
+        let context = message?.contextHint ?? ""
+        let input = context.isEmpty ? visibleText : "\(context)\n\n\(visibleText)"
+        let imagePaths = codexImagePaths(for: message?.mentions ?? [])
+        let instructions = AgentInstructions.serverInstructions
+            + AgentInstructions.skillsSection(SkillStore.shared.skillIndex)
+            + "\nThis conversation is bound to the currently open Palmier project. Use the provided Palmier tools for editor reads and edits."
+        let assistant = AgentMessage(role: .assistant, blocks: [])
+        messages.append(assistant)
+
+        do {
+            let started = try await provider.startTurn(
+                threadID: sessions[sessionIndex].externalThreadID,
+                selection: codexSelection,
+                text: input,
+                imagePaths: imagePaths,
+                cwd: projectURL,
+                instructions: instructions
+            )
+            guard currentSessionId == sessionID,
+                  let liveIndex = sessions.firstIndex(where: { $0.id == sessionID }) else {
+                await provider.cancel(threadID: started.threadID)
+                return
+            }
+            sessions[liveIndex].externalThreadID = started.threadID
+            for try await event in started.events {
+                try Task.checkCancellation()
+                guard currentSessionId == sessionID else {
+                    await provider.cancel(threadID: started.threadID)
+                    return
+                }
+                switch event {
+                case .textDelta(let text):
+                    appendTextDelta(text, toAssistant: assistant.id)
+                case .toolStarted(let id, let name, let inputJSON):
+                    appendToolUse(id: id, name: name, inputJSON: inputJSON, toAssistant: assistant.id)
+                case .toolCompleted(let id, let content, let isError):
+                    messages.append(AgentMessage(
+                        role: .user,
+                        blocks: [.toolResult(toolUseId: id, content: content, isError: isError)]
+                    ))
+                case .approvalRequested(let request):
+                    pendingApproval = request
+                case .approvalResolved(let id):
+                    if pendingApproval?.id == id { pendingApproval = nil }
+                case .completed:
+                    pendingApproval = nil
+                }
+            }
+        } catch is CancellationError {
+            dropEmptyAssistantTurn(id: assistant.id)
+        } catch {
+            dropEmptyAssistantTurn(id: assistant.id)
+            streamError = .upstream(error.localizedDescription)
+        }
+    }
+
+    func resolveApproval(_ decision: AgentApprovalDecision) {
+        guard let approval = pendingApproval else { return }
+        pendingApproval = nil
+        Task { [weak self] in
+            await self?.codexProvider?.resolveApproval(id: approval.id, decision: decision)
+        }
+    }
+
+    var codexStatusText: String {
+        switch codexAvailability {
+        case .loading: "Checking Codex…"
+        case .available: "Codex is ready."
+        case .missingExecutable: "Codex not installed"
+        case .signedOut: "Sign in to Codex"
+        case .incompatible(let detail): detail
+        case .failed(let detail): detail
+        }
+    }
+
+    private func codexImagePaths(for mentions: [AgentMention]) -> [URL] {
+        guard let editor else { return [] }
+        return mentions.compactMap { mention in
+            guard mention.type == .image,
+                  let mediaRef = mention.mediaRef,
+                  let asset = editor.mediaAssets.first(where: { $0.id == mediaRef }),
+                  asset.url.isFileURL,
+                  asset.url.path.hasPrefix("/") else { return nil }
+            return asset.url.standardizedFileURL
         }
     }
 
