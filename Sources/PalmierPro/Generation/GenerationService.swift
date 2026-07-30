@@ -163,6 +163,7 @@ final class GenerationService {
         let primaryId = placeholders[0].id
 
         Task { @MainActor in
+            var requestID: String?
             do {
                 var requestInput = plan.input
                 if !plan.referenceFileURLs.isEmpty {
@@ -175,6 +176,7 @@ final class GenerationService {
                     endpoint: plan.endpoint,
                     input: requestInput
                 )
+                requestID = submission.requestId
                 for placeholder in placeholders {
                     updateGenerationMetadata(placeholder, editor: editor, status: .generating) { input in
                         input.backendJobId = submission.requestId
@@ -202,7 +204,7 @@ final class GenerationService {
                 editor.onProjectCheckpointRequired?()
                 onFailure?()
             } catch {
-                let message = error.localizedDescription
+                let message = Self.falFailureMessage(error, requestID: requestID)
                 Log.generation.error("fal.ai image generation failed model=\(plan.endpoint) error=\(message)")
                 for placeholder in placeholders {
                     updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
@@ -240,6 +242,7 @@ final class GenerationService {
         )
 
         Task { @MainActor in
+            var requestID: String?
             do {
                 let prepared = try await Self.prepareFALUploads(plan.uploads)
                 defer { Self.cleanupTempFiles(prepared.tempFiles) }
@@ -263,6 +266,7 @@ final class GenerationService {
                     endpoint: plan.endpoint,
                     input: requestInput
                 )
+                requestID = submission.requestId
                 updateGenerationMetadata(placeholder, editor: editor, status: .generating) { input in
                     input.backendJobId = submission.requestId
                 }
@@ -285,7 +289,7 @@ final class GenerationService {
                 editor.onProjectCheckpointRequired?()
                 onFailure?()
             } catch {
-                let message = error.localizedDescription
+                let message = Self.falFailureMessage(error, requestID: requestID)
                 Log.generation.error(
                     "fal.ai media generation failed model=\(plan.endpoint) error=\(message)"
                 )
@@ -634,7 +638,7 @@ final class GenerationService {
         } catch is CancellationError {
             return
         } catch {
-            let message = error.localizedDescription
+            let message = Self.falFailureMessage(error, requestID: submission.requestId)
             Log.generation.error("fal.ai resume failed request=\(submission.requestId) error=\(message)")
             for placeholder in placeholders {
                 updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
@@ -642,6 +646,12 @@ final class GenerationService {
             editor.onProjectCheckpointRequired?()
             onFailure?()
         }
+    }
+
+    private static func falFailureMessage(_ error: Error, requestID: String?) -> String {
+        let message = error.localizedDescription
+        guard let requestID, !requestID.isEmpty else { return message }
+        return "\(message)\nRequest ID: \(requestID)"
     }
 
     private func backendError(_ error: Error) -> (code: String?, message: String) {

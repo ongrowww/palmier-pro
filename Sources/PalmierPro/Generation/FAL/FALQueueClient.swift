@@ -134,6 +134,7 @@ enum FALClientError: LocalizedError, Equatable {
     case untrustedResponseURL
     case invalidResponse
     case httpStatus(Int)
+    case remote(status: Int, code: String?, message: String)
 
     var errorDescription: String? {
         switch self {
@@ -142,7 +143,81 @@ enum FALClientError: LocalizedError, Equatable {
         case .untrustedResponseURL: "fal.ai returned an untrusted queue URL."
         case .invalidResponse: "fal.ai returned an invalid response."
         case .httpStatus(let status): "fal.ai request failed (HTTP \(status))."
+        case .remote(let status, let code, let message):
+            if code == "content_policy_violation" {
+                "The model rejected this input under its safety policy. \(message) [\(code ?? "policy error"), HTTP \(status)]"
+            } else if let code {
+                "fal.ai request failed: \(message) [\(code), HTTP \(status)]"
+            } else {
+                "fal.ai request failed: \(message) [HTTP \(status)]"
+            }
         }
+    }
+}
+
+enum FALResponseValidator {
+    private static let maximumErrorBodySize = 1_048_576
+    private static let maximumMessageLength = 500
+
+    static func validate(_ response: URLResponse, data: Data) throws {
+        guard let response = response as? HTTPURLResponse else {
+            throw FALClientError.invalidResponse
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            throw error(statusCode: response.statusCode, data: data)
+        }
+    }
+
+    static func error(statusCode: Int, data: Data) -> FALClientError {
+        guard data.count <= maximumErrorBodySize,
+              let payload = try? JSONDecoder().decode(FALJSONValue.self, from: data),
+              let fields = errorFields(from: payload),
+              let message = sanitized(fields.message),
+              !message.isEmpty else {
+            return .httpStatus(statusCode)
+        }
+        return .remote(
+            status: statusCode,
+            code: fields.code.flatMap(sanitized),
+            message: message
+        )
+    }
+
+    private static func errorFields(from payload: FALJSONValue) -> (code: String?, message: String)? {
+        guard let root = payload.objectValue else { return nil }
+
+        if let detail = root["detail"] {
+            if let fields = fields(from: detail) {
+                return fields
+            }
+            if let first = detail.arrayValue?.compactMap(fields(from:)).first {
+                return first
+            }
+        }
+
+        return fields(from: payload)
+    }
+
+    private static func fields(from value: FALJSONValue) -> (code: String?, message: String)? {
+        if let message = value.stringValue {
+            return (nil, message)
+        }
+        guard let object = value.objectValue else { return nil }
+        let message = object["msg"]?.stringValue
+            ?? object["message"]?.stringValue
+            ?? object["error"]?.stringValue
+        guard let message else { return nil }
+        let code = object["type"]?.stringValue ?? object["code"]?.stringValue
+        return (code, message)
+    }
+
+    private static func sanitized(_ value: String) -> String? {
+        let collapsed = value
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !collapsed.isEmpty else { return nil }
+        return String(collapsed.prefix(maximumMessageLength))
     }
 }
 
@@ -315,26 +390,17 @@ actor FALQueueClient {
             method: "PUT",
             apiKey: apiKey
         )
-        let (_, response) = try await session.data(for: request)
-        try Self.validate(response)
+        let (data, response) = try await session.data(for: request)
+        try FALResponseValidator.validate(response, data: data)
     }
 
     private func perform<Value: Decodable>(_ request: URLRequest, as type: Value.Type) async throws -> Value {
         let (data, response) = try await session.data(for: request)
-        try Self.validate(response)
+        try FALResponseValidator.validate(response, data: data)
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
             throw FALClientError.invalidResponse
-        }
-    }
-
-    private static func validate(_ response: URLResponse) throws {
-        guard let response = response as? HTTPURLResponse else {
-            throw FALClientError.invalidResponse
-        }
-        guard (200..<300).contains(response.statusCode) else {
-            throw FALClientError.httpStatus(response.statusCode)
         }
     }
 }

@@ -436,6 +436,31 @@ struct PreviewContainerView: View {
         """
     }
 
+    private static func generationFailurePrefill(asset: MediaAsset, error: String) -> String {
+        let input = asset.generationInput
+        let provider = input?.generationProvider ?? "(unknown)"
+        let model = input?.model ?? "(unknown)"
+        let endpoint = input?.backendEndpoint ?? "(unknown)"
+        let requestID = input?.backendJobId ?? "(not submitted)"
+        let safeError = error
+            .split(whereSeparator: \.isWhitespace)
+            .map { $0.contains("://") ? "[redacted URL]" : String($0) }
+            .joined(separator: " ")
+            .prefix(1_000)
+
+        return """
+        An AI generation failed.
+
+        Provider: \(provider)
+        Model: \(model)
+        Endpoint: \(endpoint)
+        Request ID: \(requestID)
+        Error: \(safeError)
+
+        What were you trying to create when this happened?
+        """
+    }
+
     private func offlinePreview(assetId: String?, path: String?, isUnprocessable: Bool) -> some View {
         ZStack {
             Color.black.opacity(AppTheme.Opacity.strong)
@@ -509,22 +534,32 @@ struct PreviewContainerView: View {
                 }
                 .frame(maxWidth: 520, maxHeight: 240)
                 .fixedSize(horizontal: false, vertical: true)
-                if let asset = activeMediaAsset, asset.pendingDownloadURL != nil {
-                    Button {
-                        editor.generationService.retryDownload(asset: asset, editor: editor)
-                    } label: {
-                        HStack(spacing: AppTheme.Spacing.xs) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Retry Download")
+                if let asset = activeMediaAsset {
+                    HStack(spacing: AppTheme.Spacing.sm) {
+                        if asset.pendingDownloadURL != nil {
+                            Button {
+                                editor.generationService.retryDownload(asset: asset, editor: editor)
+                            } label: {
+                                HStack(spacing: AppTheme.Spacing.xs) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Retry Download")
+                                }
+                                .font(.system(size: AppTheme.FontSize.sm, weight: .medium))
+                                .foregroundStyle(AppTheme.Text.primaryColor)
+                                .padding(.horizontal, AppTheme.Spacing.md)
+                                .padding(.vertical, AppTheme.Spacing.sm)
+                            }
+                            .buttonStyle(.plain)
+                            .background(.white.opacity(AppTheme.Opacity.soft), in: .capsule)
+                            .overlay(Capsule().strokeBorder(.white.opacity(AppTheme.Opacity.muted), lineWidth: AppTheme.BorderWidth.hairline))
                         }
-                        .font(.system(size: AppTheme.FontSize.sm, weight: .medium))
-                        .foregroundStyle(AppTheme.Text.primaryColor)
-                        .padding(.horizontal, AppTheme.Spacing.md)
-                        .padding(.vertical, AppTheme.Spacing.sm)
+                        Button("Report a Problem") {
+                            FeedbackWindowController.shared.show(
+                                prefill: Self.generationFailurePrefill(asset: asset, error: error)
+                            )
+                        }
+                        .buttonStyle(.capsule(.secondary, size: .regular))
                     }
-                    .buttonStyle(.plain)
-                    .background(.white.opacity(AppTheme.Opacity.soft), in: .capsule)
-                    .overlay(Capsule().strokeBorder(.white.opacity(AppTheme.Opacity.muted), lineWidth: AppTheme.BorderWidth.hairline))
                 }
             }
             .padding(AppTheme.Spacing.xl)

@@ -103,4 +103,54 @@ struct FALQueueClientTests {
             )
         }
     }
+
+    @Test func surfacesStructuredPolicyErrorWithoutEchoingInput() {
+        let data = Data("""
+        {
+          "detail": [{
+            "type": "content_policy_violation",
+            "msg": "The image may contain a likeness of a real person.",
+            "input": {
+              "image_url": "https://private.example/secret-image.jpg",
+              "prompt": "private prompt"
+            }
+          }]
+        }
+        """.utf8)
+
+        let error = FALResponseValidator.error(statusCode: 422, data: data)
+        #expect(error == .remote(
+            status: 422,
+            code: "content_policy_violation",
+            message: "The image may contain a likeness of a real person."
+        ))
+        #expect(error.localizedDescription.contains("safety policy"))
+        #expect(error.localizedDescription.contains("content_policy_violation"))
+        #expect(!error.localizedDescription.contains("private.example"))
+        #expect(!error.localizedDescription.contains("private prompt"))
+    }
+
+    @Test func surfacesGenericRemoteErrorMessage() {
+        let data = Data("""
+        {
+          "error": "Model capacity is temporarily unavailable.",
+          "code": "capacity_unavailable"
+        }
+        """.utf8)
+
+        let error = FALResponseValidator.error(statusCode: 503, data: data)
+        #expect(error == .remote(
+            status: 503,
+            code: "capacity_unavailable",
+            message: "Model capacity is temporarily unavailable."
+        ))
+    }
+
+    @Test func fallsBackToStatusForMalformedRemoteError() {
+        let error = FALResponseValidator.error(
+            statusCode: 500,
+            data: Data("not-json".utf8)
+        )
+        #expect(error == .httpStatus(500))
+    }
 }
