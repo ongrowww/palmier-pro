@@ -9,6 +9,7 @@ struct PreviewContainerView: View {
 
     @State private var hoveredTabId: String?
     @State private var failedImagePreviewKey: String?
+    @State private var showingFailureDiagnosis = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -436,7 +437,7 @@ struct PreviewContainerView: View {
         """
     }
 
-    private static func generationFailurePrefill(asset: MediaAsset, error: String) -> String {
+    private static func generationFailureDetails(asset: MediaAsset, error: String) -> String {
         let input = asset.generationInput
         let provider = input?.generationProvider ?? "(unknown)"
         let model = input?.model ?? "(unknown)"
@@ -449,15 +450,11 @@ struct PreviewContainerView: View {
             .prefix(1_000)
 
         return """
-        An AI generation failed.
-
         Provider: \(provider)
         Model: \(model)
         Endpoint: \(endpoint)
         Request ID: \(requestID)
         Error: \(safeError)
-
-        What were you trying to create when this happened?
         """
     }
 
@@ -553,12 +550,21 @@ struct PreviewContainerView: View {
                             .background(.white.opacity(AppTheme.Opacity.soft), in: .capsule)
                             .overlay(Capsule().strokeBorder(.white.opacity(AppTheme.Opacity.muted), lineWidth: AppTheme.BorderWidth.hairline))
                         }
-                        Button("Report a Problem") {
-                            FeedbackWindowController.shared.show(
-                                prefill: Self.generationFailurePrefill(asset: asset, error: error)
-                            )
+                        Button {
+                            showingFailureDiagnosis = true
+                        } label: {
+                            HStack(spacing: AppTheme.Spacing.xs) {
+                                Image(systemName: "stethoscope")
+                                Text("Check Problem")
+                            }
                         }
                         .buttonStyle(.capsule(.secondary, size: .regular))
+                        .popover(isPresented: $showingFailureDiagnosis, arrowEdge: .bottom) {
+                            FALFailureDiagnosisPopover(
+                                diagnosis: FALFailureDiagnosis.make(error: error),
+                                details: Self.generationFailureDetails(asset: asset, error: error)
+                            )
+                        }
                     }
                 }
             }
@@ -821,6 +827,72 @@ private enum ZoomPreset: CaseIterable {
 }
 
 // MARK: - Hot-path subviews
+
+private struct FALFailureDiagnosisPopover: View {
+    let diagnosis: FALFailureDiagnosis
+    let details: String
+
+    @State private var showingTechnicalDetails = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.mdLg) {
+            HStack(alignment: .top, spacing: AppTheme.Spacing.smMd) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: AppTheme.FontSize.lg))
+                    .foregroundStyle(AppTheme.Status.errorColor)
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+                    Text(diagnosis.title)
+                        .font(.system(size: AppTheme.FontSize.md, weight: .semibold))
+                        .foregroundStyle(AppTheme.Text.primaryColor)
+                    Text(diagnosis.explanation)
+                        .font(.system(size: AppTheme.FontSize.sm))
+                        .foregroundStyle(AppTheme.Text.secondaryColor)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
+                Text("What to do")
+                    .font(.system(size: AppTheme.FontSize.sm, weight: .semibold))
+                    .foregroundStyle(AppTheme.Text.primaryColor)
+                Text(diagnosis.recovery)
+                    .font(.system(size: AppTheme.FontSize.sm))
+                    .foregroundStyle(AppTheme.Text.secondaryColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            DisclosureGroup("Technical Details", isExpanded: $showingTechnicalDetails) {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                    ScrollView {
+                        Text(details)
+                            .font(.system(size: AppTheme.FontSize.xs, design: .monospaced))
+                            .foregroundStyle(AppTheme.Text.tertiaryColor)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 120)
+
+                    Button("Copy Details") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(details, forType: .string)
+                    }
+                    .buttonStyle(.capsule(.secondary, size: .small))
+                }
+                .padding(.top, AppTheme.Spacing.xs)
+            }
+            .font(.system(size: AppTheme.FontSize.sm, weight: .medium))
+
+            HStack(spacing: AppTheme.Spacing.xs) {
+                Image(systemName: "lock")
+                Text("This check runs locally. Nothing is sent.")
+            }
+            .font(.system(size: AppTheme.FontSize.xs))
+            .foregroundStyle(AppTheme.Text.tertiaryColor)
+        }
+        .padding(AppTheme.Spacing.lg)
+        .frame(width: 380)
+    }
+}
 
 private struct PreviewTimecodeText: View {
     @Environment(EditorViewModel.self) var editor
