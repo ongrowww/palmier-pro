@@ -317,6 +317,7 @@ enum FALVideoGenerationPlanner {
         ]
     }
 
+    @MainActor
     private static func upload(
         _ asset: MediaAsset,
         target: FALMediaUpload.Target,
@@ -330,6 +331,7 @@ enum FALVideoGenerationPlanner {
         )
     }
 
+    @MainActor
     private static func arrayUploads(
         _ assets: [MediaAsset],
         key: String,
