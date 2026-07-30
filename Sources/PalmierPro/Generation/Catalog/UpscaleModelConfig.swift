@@ -157,6 +157,11 @@ struct UpscaleModelConfig: Identifiable, Sendable {
     }
 
     private func targetLongEdge(_ value: String) -> Int {
-        value == "1080p" ? 1920 : 3840
+        switch value {
+        case "720p": 1280
+        case "1080p": 1920
+        case "1440p": 2560
+        default: 3840
+        }
     }
 }

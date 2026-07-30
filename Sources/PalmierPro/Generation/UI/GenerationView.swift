@@ -73,7 +73,7 @@ struct GenerationView: View {
 
     @State var dropError: String? = nil
     @State var dropErrorTask: Task<Void, Never>? = nil
-    @State var pendingFALConfirmation: FALImageGenerationPlan? = nil
+    @State var pendingFALConfirmation: FALGenerationConfirmation? = nil
 
     @AppStorage("generationPromptExtra") private var promptExtra: Double = 0
     @State private var liveExtra: Double?
@@ -158,7 +158,7 @@ struct GenerationView: View {
                 title: Text("Generate with fal.ai?"),
                 message: Text(plan.confirmationMessage),
                 primaryButton: .default(Text("Generate · \(plan.estimatedCostLabel)")) {
-                    submitConfirmedFALImage(plan)
+                    submitConfirmedFALGeneration(plan)
                 },
                 secondaryButton: .cancel()
             )

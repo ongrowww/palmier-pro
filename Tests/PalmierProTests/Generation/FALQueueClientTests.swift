@@ -17,6 +17,8 @@ struct FALQueueClientTests {
         #expect(request.url?.absoluteString == "https://queue.fal.run/fal-ai/nano-banana-2")
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Key test-key")
+        #expect(request.value(forHTTPHeaderField: "X-Fal-Object-Lifecycle-Preference")
+            == #"{"expiration_duration_seconds":86400}"#)
 
         let body = try #require(request.httpBody)
         let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])

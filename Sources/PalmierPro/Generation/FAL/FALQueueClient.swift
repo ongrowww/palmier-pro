@@ -62,6 +62,40 @@ enum FALJSONValue: Codable, Equatable, Sendable {
         }
         return urls
     }
+
+    func mediaURLs() throws -> [String] {
+        guard let object = objectValue else {
+            throw FALMediaGenerationError.missingResult
+        }
+        for key in ["images", "image", "video", "audio"] {
+            guard let value = object[key] else { continue }
+            let urls = Self.collectURLs(from: value)
+            if !urls.isEmpty { return urls }
+        }
+        let urls = Self.collectURLs(from: self)
+        guard !urls.isEmpty else {
+            throw FALMediaGenerationError.missingResult
+        }
+        return urls
+    }
+
+    private static func collectURLs(from value: FALJSONValue) -> [String] {
+        switch value {
+        case .object(let object):
+            if let url = object["url"]?.stringValue,
+               let parsed = URL(string: url),
+               parsed.scheme == "https" {
+                return [url]
+            }
+            return object.keys.sorted().flatMap { key in
+                object[key].map(collectURLs(from:)) ?? []
+            }
+        case .array(let values):
+            return values.flatMap(collectURLs(from:))
+        case .string, .number, .bool, .null:
+            return []
+        }
+    }
 }
 
 struct FALQueueSubmission: Decodable, Equatable, Sendable {
@@ -127,6 +161,10 @@ struct FALQueueRequestBuilder {
         request.setValue("Key \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(
+            #"{"expiration_duration_seconds":86400}"#,
+            forHTTPHeaderField: "X-Fal-Object-Lifecycle-Preference"
+        )
         request.httpBody = try JSONEncoder().encode(input)
         return request
     }

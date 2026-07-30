@@ -96,7 +96,7 @@ struct FALPreviewCatalog {
                 "bytedance/seedance-2.0/reference-to-video",
             ],
             durations: Array(4...15),
-            resolutions: ["480p", "720p"],
+            resolutions: ["480p", "720p", "1080p", "4k"],
             aspectRatios: commonVideoAspectRatios,
             firstFrame: true,
             lastFrame: true,
@@ -115,14 +115,14 @@ struct FALPreviewCatalog {
                 "fal-ai/kling-video/v3/standard/image-to-video",
             ],
             durations: Array(3...15),
-            resolutions: ["720p", "1080p"],
+            resolutions: nil,
             aspectRatios: ["16:9", "9:16", "1:1"],
             firstFrame: true,
             lastFrame: true,
-            referenceImages: 4,
-            referenceVideos: 1,
+            referenceImages: 0,
+            referenceVideos: 0,
             referenceAudios: 0,
-            totalReferences: 4,
+            totalReferences: 0,
             exclusiveModes: false
         ),
         video(
@@ -131,15 +131,15 @@ struct FALPreviewCatalog {
             vendor: "Google",
             endpoints: ["fal-ai/veo3.1", "fal-ai/veo3.1/image-to-video"],
             durations: [4, 6, 8],
-            resolutions: ["720p", "1080p"],
+            resolutions: ["720p", "1080p", "4k"],
             aspectRatios: ["16:9", "9:16"],
             firstFrame: true,
             lastFrame: false,
-            referenceImages: 1,
+            referenceImages: 0,
             referenceVideos: 0,
             referenceAudios: 0,
-            totalReferences: 1,
-            exclusiveModes: true
+            totalReferences: 0,
+            exclusiveModes: false
         ),
         audio(
             id: "fal-ai/elevenlabs/tts/eleven-v3",
@@ -179,7 +179,11 @@ struct FALPreviewCatalog {
             endpoints: ["fal-ai/elevenlabs/dubbing"],
             inputs: ["audio", "video"],
             minPromptLength: 0,
-            targetLanguages: ["de", "en", "es", "fr", "it"],
+            targetLanguages: [
+                "ar", "bg", "zh", "hr", "cs", "da", "nl", "en", "fi", "fr",
+                "de", "el", "hi", "hu", "id", "it", "ja", "ko", "ms", "no",
+                "pl", "pt", "ro", "ru", "sk", "es", "sv", "ta", "tr", "uk",
+            ],
             defaultTargetLanguage: "de"
         ),
         upscale(
@@ -187,17 +191,35 @@ struct FALPreviewCatalog {
             name: "Topaz Image",
             endpoints: ["fal-ai/topaz/upscale/image"],
             supportedTypes: ["image"],
+            maximumUpscaleFactor: 8,
             settings: [
                 selectSetting(
                     id: "enhancementModel",
                     label: "Enhancement",
                     values: [
+                        ("Low Resolution V2", "Low Resolution V2"),
                         ("Standard V2", "Standard V2"),
                         ("High Fidelity V2", "High Fidelity V2"),
                         ("Recovery V2", "Recovery V2"),
                         ("CGI", "CGI"),
+                        ("Text Refine", "Text Refine"),
+                        ("Recovery", "Recovery"),
+                        ("Redefine", "Redefine"),
+                        ("Standard MAX", "Standard MAX"),
+                        ("Wonder", "Wonder"),
+                        ("Wonder 3", "Wonder 3"),
                     ],
                     defaultValue: "Standard V2"
+                ),
+                selectSetting(
+                    id: "targetResolution",
+                    label: "Resolution",
+                    values: [
+                        ("1080p", "1080p"),
+                        ("1440p", "1440p"),
+                        ("4k", "4K"),
+                    ],
+                    defaultValue: "4k"
                 ),
             ]
         ),
@@ -206,11 +228,40 @@ struct FALPreviewCatalog {
             name: "Topaz Video",
             endpoints: ["fal-ai/topaz/upscale/video"],
             supportedTypes: ["video"],
+            maximumUpscaleFactor: 8,
             settings: [
+                selectSetting(
+                    id: "enhancementModel",
+                    label: "Enhancement",
+                    values: [
+                        ("Proteus", "Proteus"),
+                        ("Artemis HQ", "Artemis HQ"),
+                        ("Artemis MQ", "Artemis MQ"),
+                        ("Artemis LQ", "Artemis LQ"),
+                        ("Nyx", "Nyx"),
+                        ("Nyx Fast", "Nyx Fast"),
+                        ("Nyx XL", "Nyx XL"),
+                        ("Nyx HF", "Nyx HF"),
+                        ("Gaia HQ", "Gaia HQ"),
+                        ("Gaia CG", "Gaia CG"),
+                        ("Gaia 2", "Gaia 2"),
+                        ("Starlight Precise 2.5", "Starlight Precise 2.5"),
+                        ("Starlight HQ", "Starlight HQ"),
+                        ("Starlight Mini", "Starlight Mini"),
+                        ("Starlight Sharp", "Starlight Sharp"),
+                        ("Starlight Fast 2", "Starlight Fast 2"),
+                    ],
+                    defaultValue: "Proteus"
+                ),
                 selectSetting(
                     id: "targetResolution",
                     label: "Resolution",
-                    values: [("1080p", "1080p"), ("4k", "4K")],
+                    values: [
+                        ("720p", "720p"),
+                        ("1080p", "1080p"),
+                        ("1440p", "1440p"),
+                        ("4k", "4K"),
+                    ],
                     defaultValue: "4k"
                 ),
                 selectSetting(
@@ -226,11 +277,17 @@ struct FALPreviewCatalog {
             name: "SeedVR2",
             endpoints: ["fal-ai/seedvr/upscale/image", "fal-ai/seedvr/upscale/video"],
             supportedTypes: ["image", "video"],
+            maximumUpscaleFactor: 10,
             settings: [
                 selectSetting(
                     id: "targetResolution",
                     label: "Resolution",
-                    values: [("1080p", "1080p"), ("4k", "4K")],
+                    values: [
+                        ("720p", "720p"),
+                        ("1080p", "1080p"),
+                        ("1440p", "1440p"),
+                        ("4k", "4K"),
+                    ],
                     defaultValue: "4k"
                 ),
             ]
@@ -278,7 +335,7 @@ struct FALPreviewCatalog {
         vendor: String,
         endpoints: [String],
         durations: [Int],
-        resolutions: [String],
+        resolutions: [String]?,
         aspectRatios: [String],
         firstFrame: Bool,
         lastFrame: Bool,
@@ -312,7 +369,8 @@ struct FALPreviewCatalog {
                 requiresSourceVideo: false,
                 maxSourceVideoResolution: nil,
                 requiresReferenceImage: false
-            ))
+            )),
+            audioDiscountRate: ["": 1]
         )
     }
 
@@ -368,6 +426,7 @@ struct FALPreviewCatalog {
         name: String,
         endpoints: [String],
         supportedTypes: [String],
+        maximumUpscaleFactor: Double,
         settings: [UpscaleSelectSetting]
     ) -> CatalogEntry {
         CatalogEntry(
@@ -380,7 +439,7 @@ struct FALPreviewCatalog {
             uiCapabilities: .upscale(UpscaleCaps(
                 speed: "Medium",
                 p75DurationSeconds: 60,
-                maximumUpscaleFactor: 4,
+                maximumUpscaleFactor: maximumUpscaleFactor,
                 supportedTypes: supportedTypes,
                 selectSettings: settings,
                 numericSettings: nil,

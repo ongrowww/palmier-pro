@@ -35,6 +35,13 @@ struct FALPreviewCatalogTests {
         #expect(categories.contains(.dubbing))
     }
 
+    @Test func connectsEveryAdvertisedFALModel() {
+        let catalog = FALPreviewCatalog.shared
+        #expect(Set(catalog.video.map(\.id)) == FALVideoGenerationPlanner.supportedModelIds)
+        #expect(Set(catalog.audio.map(\.id)) == FALAudioGenerationPlanner.supportedModelIds)
+        #expect(Set(catalog.upscale.map(\.id)) == FALUpscaleGenerationPlanner.supportedModelIds)
+    }
+
     @Test func separatesExecutionProviderFromModelVendor() {
         let model = FALPreviewCatalog.shared.image.first {
             $0.id == "fal-ai/nano-banana-2"

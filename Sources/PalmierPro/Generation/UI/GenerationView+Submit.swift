@@ -95,21 +95,52 @@ extension GenerationView {
     }
 
     private var estimatedFALCostMicroUSD: Int? {
-        guard selectedProvider == .fal,
-              selectedType == .image,
-              FALImageGenerationPlanner.supportedModelIds.contains(imageModel.id) else {
-            return nil
+        guard selectedProvider == .fal else { return nil }
+        switch selectedType {
+        case .image:
+            let imageCount = imageModel.maxImages > 1
+                ? min(imageModel.maxImages, max(1, selectedNumImages)) : 1
+            return try? FALImageGenerationPlanner.estimatedCostMicroUSD(
+                modelId: imageModel.id,
+                aspectRatio: selectedAspectRatio,
+                resolution: effectiveResolution,
+                quality: imageModel.qualities != nil ? selectedQuality : nil,
+                numImages: imageCount,
+                referenceCount: imageReferences.count
+            )
+        case .video:
+            return try? FALVideoGenerationPlanner.estimatedCostMicroUSD(
+                modelId: videoModel.id,
+                duration: effectiveVideoSeconds,
+                resolution: effectiveResolution,
+                generateAudio: effectiveGenerateAudio,
+                hasVideoReference: !refVideos.isEmpty
+            )
+        case .audio:
+            let duration = audioUsesSource
+                ? effectiveAudioSourceSeconds
+                : (audioModel.hasDurationControl ? selectedAudioDuration : 0)
+            return try? FALAudioGenerationPlanner.estimatedCostMicroUSD(
+                modelId: audioModel.id,
+                prompt: trimmedPrompt,
+                duration: duration
+            )
+        case .upscale:
+            guard let source = upscaleSource,
+                  let width = source.sourceWidth,
+                  let height = source.sourceHeight else { return nil }
+            let target = upscaleSettings.selections["targetResolution"] ?? "4k"
+            return try? FALUpscaleGenerationPlanner.estimatedCostMicroUSD(
+                modelId: upscaleModel.id,
+                sourceType: source.type,
+                width: width,
+                height: height,
+                fps: source.sourceFPS,
+                duration: Double(effectiveUpscaleSeconds),
+                targetLongEdge: FALUpscaleGenerationPlanner.targetLongEdge(target),
+                targetFPS: upscaleSettings.selections["targetFPS"]
+            )
         }
-        let imageCount = imageModel.maxImages > 1
-            ? min(imageModel.maxImages, max(1, selectedNumImages)) : 1
-        return try? FALImageGenerationPlanner.estimatedCostMicroUSD(
-            modelId: imageModel.id,
-            aspectRatio: selectedAspectRatio,
-            resolution: effectiveResolution,
-            quality: imageModel.qualities != nil ? selectedQuality : nil,
-            numImages: imageCount,
-            referenceCount: imageReferences.count
-        )
     }
 
     private var costHelpText: String {
@@ -120,8 +151,11 @@ extension GenerationView {
             let label = (Double(cost) / 1_000_000).formatted(
                 .currency(code: "USD").precision(.fractionLength(3))
             )
-            let referenceNote = imageReferences.isEmpty
-                ? "" : " Reference inputs may add usage-based charges."
+            let hasReferences = !imageReferences.isEmpty
+                || firstFrame != nil || lastFrame != nil
+                || !refImages.isEmpty || !refVideos.isEmpty || !refAudios.isEmpty
+            let referenceNote = hasReferences
+                ? " Reference inputs may add usage-based charges." : ""
             return "\(label) estimated.\(referenceNote) Your fal.ai account is billed directly; pricing may change."
         }
         guard let cost = estimatedCost else {
@@ -162,14 +196,15 @@ extension GenerationView {
     @ViewBuilder
     var submitButton: some View {
         if selectedProvider == .fal {
+            let connected = isCurrentFALModelConnected
             Button {
                 if !falCredentials.hasKey {
                     SettingsWindowController.shared.show(tab: .providers)
-                } else if selectedType == .image {
+                } else if connected {
                     prepareFALGeneration()
                 }
             } label: {
-                Image(systemName: falCredentials.hasKey && selectedType == .image
+                Image(systemName: falCredentials.hasKey && connected
                     ? "arrow.up" : falCredentials.hasKey ? "hammer.fill" : "key.horizontal")
                     .font(.system(size: AppTheme.FontSize.sm, weight: .bold))
                     .frame(width: AppTheme.IconSize.sm, height: AppTheme.IconSize.sm)
@@ -178,18 +213,18 @@ extension GenerationView {
             .buttonBorderShape(.circle)
             .controlSize(.regular)
             .tint(AppTheme.Accent.primary)
-            .disabled(falCredentials.hasKey && (selectedType != .image || !canSubmit))
+            .disabled(falCredentials.hasKey && (!connected || !canSubmit))
             .opacity(
-                falCredentials.hasKey && (selectedType != .image || !canSubmit)
+                falCredentials.hasKey && (!connected || !canSubmit)
                     ? AppTheme.Opacity.strong : AppTheme.Opacity.opaque
             )
             .accessibilityLabel(
                 !falCredentials.hasKey ? "Add FAL API key"
-                    : selectedType == .image ? "Generate with fal.ai" : "FAL integration preview"
+                    : connected ? "Generate with fal.ai" : "FAL integration preview"
             )
             .help(
                 !falCredentials.hasKey ? "Add a fal.ai API key in Settings."
-                    : selectedType == .image ? "Review estimated fal.ai cost and generate."
+                    : connected ? "Review estimated fal.ai cost and generate."
                     : "This fal.ai media type is not connected yet."
             )
         } else {
@@ -216,47 +251,136 @@ extension GenerationView {
 
     // MARK: - Actions
 
+    private var isCurrentFALModelConnected: Bool {
+        switch selectedType {
+        case .image: FALImageGenerationPlanner.supportedModelIds.contains(imageModel.id)
+        case .video: FALVideoGenerationPlanner.supportedModelIds.contains(videoModel.id)
+        case .audio: FALAudioGenerationPlanner.supportedModelIds.contains(audioModel.id)
+        case .upscale: FALUpscaleGenerationPlanner.supportedModelIds.contains(upscaleModel.id)
+        }
+    }
+
     private func prepareFALGeneration() {
-        guard selectedProvider == .fal, selectedType == .image else { return }
+        guard selectedProvider == .fal else { return }
         guard falCredentials.hasKey else {
             SettingsWindowController.shared.show(tab: .providers)
             return
         }
-        if let error = preflightValidation(audioDuration: 0) {
+        let audioDuration = selectedType == .audio
+            ? (audioUsesSource
+                ? effectiveAudioSourceSeconds
+                : (audioModel.hasDurationControl ? selectedAudioDuration : 0))
+            : 0
+        if let error = preflightValidation(audioDuration: audioDuration) {
             flashDropError(error)
             return
         }
-        let imageCount = imageModel.maxImages > 1
-            ? min(imageModel.maxImages, max(1, selectedNumImages)) : 1
-        var input = GenerationInput(
-            prompt: prompt,
-            model: imageModel.id,
-            duration: 0,
-            aspectRatio: selectedAspectRatio,
-            resolution: effectiveResolution,
-            quality: imageModel.qualities != nil ? selectedQuality : nil,
-            numImages: imageCount > 1 ? imageCount : nil
-        )
-        input.generationProvider = GenerationProvider.fal.rawValue
-        input.backendEndpoint = FALImageGenerationPlanner.endpoint(
-            modelId: imageModel.id,
-            isEditing: !imageReferences.isEmpty
-        )
-        input.imageURLAssetIds = imageReferences.isEmpty ? nil : imageReferences.map(\.id)
 
         do {
-            pendingFALConfirmation = try FALImageGenerationPlanner.makePlan(
-                generationInput: input,
-                model: imageModel,
-                numImages: imageCount,
-                references: imageReferences,
-                folderId: editFolderId
-                    ?? imageReferences.last?.folderId
-                    ?? editor.mediaPanelCurrentFolderId,
-                replacementClipId: editor.pendingEditReplacementClipId
-            )
+            switch selectedType {
+            case .image:
+                let imageCount = imageModel.maxImages > 1
+                    ? min(imageModel.maxImages, max(1, selectedNumImages)) : 1
+                var input = GenerationInput(
+                    prompt: prompt,
+                    model: imageModel.id,
+                    duration: 0,
+                    aspectRatio: selectedAspectRatio,
+                    resolution: effectiveResolution,
+                    quality: imageModel.qualities != nil ? selectedQuality : nil,
+                    numImages: imageCount > 1 ? imageCount : nil
+                )
+                input.generationProvider = GenerationProvider.fal.rawValue
+                input.backendEndpoint = FALImageGenerationPlanner.endpoint(
+                    modelId: imageModel.id,
+                    isEditing: !imageReferences.isEmpty
+                )
+                input.imageURLAssetIds = imageReferences.isEmpty ? nil : imageReferences.map(\.id)
+                pendingFALConfirmation = .image(try FALImageGenerationPlanner.makePlan(
+                    generationInput: input,
+                    model: imageModel,
+                    numImages: imageCount,
+                    references: imageReferences,
+                    folderId: editFolderId
+                        ?? imageReferences.last?.folderId
+                        ?? editor.mediaPanelCurrentFolderId,
+                    replacementClipId: editor.pendingEditReplacementClipId
+                ))
+            case .video:
+                let assets = videoInputAssets(for: videoModel)
+                let input = GenerationInput(
+                    prompt: prompt,
+                    model: videoModel.id,
+                    duration: effectiveVideoSeconds,
+                    aspectRatio: selectedAspectRatio,
+                    resolution: effectiveResolution,
+                    generateAudio: effectiveGenerateAudio
+                )
+                pendingFALConfirmation = .media(try FALVideoGenerationPlanner.makePlan(
+                    generationInput: input,
+                    model: videoModel,
+                    inputAssets: assets,
+                    generateAudio: effectiveGenerateAudio,
+                    folderId: editFolderId
+                        ?? assets.textToVideoReferences.last?.folderId
+                        ?? editor.mediaPanelCurrentFolderId,
+                    replacementClipId: editor.pendingEditReplacementClipId
+                ))
+            case .audio:
+                let source = audioUsesSource ? audioSource : nil
+                let input = GenerationInput(
+                    prompt: prompt,
+                    model: audioModel.id,
+                    duration: audioDuration,
+                    aspectRatio: "",
+                    resolution: nil,
+                    voice: audioModel.voices != nil && !selectedVoice.isEmpty ? selectedVoice : nil,
+                    instrumental: audioModel.supportsInstrumental ? instrumental : nil,
+                    targetLanguage: audioModel.targetLanguages != nil ? selectedTargetLanguage : nil
+                )
+                pendingFALConfirmation = .media(try FALAudioGenerationPlanner.makePlan(
+                    generationInput: input,
+                    model: audioModel,
+                    source: source,
+                    duration: audioDuration,
+                    voice: input.voice,
+                    instrumental: instrumental,
+                    targetLanguage: input.targetLanguage,
+                    trimmedSource: source.flatMap(audioSourceTrimmedSource),
+                    folderId: editFolderId
+                        ?? source?.folderId
+                        ?? editor.mediaPanelCurrentFolderId,
+                    replacementClipId: editor.pendingEditReplacementClipId
+                ))
+            case .upscale:
+                guard let source = upscaleSource else {
+                    throw FALMediaGenerationError.missingSource
+                }
+                var input = EditSubmitter.upscaleSeed(
+                    for: source,
+                    model: upscaleModel,
+                    trimmedSource: editor.pendingEditTrimmedSource
+                )
+                input.upscaleSettings = upscaleSettings
+                pendingFALConfirmation = .media(try FALUpscaleGenerationPlanner.makePlan(
+                    generationInput: input,
+                    model: upscaleModel,
+                    source: source,
+                    settings: upscaleSettings,
+                    trimmedSource: editor.pendingEditTrimmedSource,
+                    folderId: editFolderId ?? source.folderId ?? editor.mediaPanelCurrentFolderId,
+                    replacementClipId: editor.pendingEditReplacementClipId
+                ))
+            }
         } catch {
             flashDropError(error.localizedDescription)
+        }
+    }
+
+    func submitConfirmedFALGeneration(_ confirmation: FALGenerationConfirmation) {
+        switch confirmation {
+        case .image(let plan): submitConfirmedFALImage(plan)
+        case .media(let plan): submitConfirmedFALMedia(plan)
         }
     }
 
@@ -292,6 +416,73 @@ extension GenerationView {
             onComplete: onComplete,
             onFailure: onFailure
         )
+        if plan.replacementClipId == nil {
+            editor.selectMediaPanelItem(assetId)
+        }
+        editor.clearPendingGenerationPanelState()
+        prompt = ""
+        editFolderId = nil
+        clearReferences()
+    }
+
+    private func submitConfirmedFALMedia(_ plan: FALMediaGenerationPlan) {
+        let editorRef = editor
+        let pendingAudioPlacement = plan.outputType == .audio
+            ? editor.pendingEditAudioPlacement : nil
+        let transitionPlacement = plan.outputType == .video
+            ? editor.pendingEditTransitionPlacement : nil
+        if let clipId = plan.replacementClipId {
+            editor.markPendingReplacement(clipId: clipId)
+        }
+        let replacementComplete: (@MainActor (MediaAsset) -> Void)? = {
+            guard let clipId = plan.replacementClipId else { return nil }
+            return { [weak editorRef] asset in
+                editorRef?.replaceClipMediaRef(
+                    clipId: clipId,
+                    newAssetId: asset.id,
+                    resetTrim: false
+                )
+                editorRef?.clearPendingReplacement(clipId: clipId)
+            }
+        }()
+        let onComplete: (@MainActor (MediaAsset) -> Void)? = {
+            guard pendingAudioPlacement != nil || transitionPlacement != nil else {
+                return replacementComplete
+            }
+            return { [weak editorRef] asset in
+                if pendingAudioPlacement != nil {
+                    editorRef?.finalizeGeneratingClip(placeholderId: asset.id, asset: asset)
+                }
+                if transitionPlacement != nil {
+                    editorRef?.finalizeTransitionClip(placeholderId: asset.id, asset: asset)
+                }
+                replacementComplete?(asset)
+            }
+        }()
+        let onFailure: (@MainActor () -> Void)? = {
+            guard let clipId = plan.replacementClipId else { return nil }
+            return { [weak editorRef] in
+                editorRef?.clearPendingReplacement(clipId: clipId)
+            }
+        }()
+        let assetId = editor.generationService.generateFALMedia(
+            plan: plan,
+            projectURL: editor.projectURL,
+            editor: editor,
+            onComplete: onComplete,
+            onFailure: onFailure
+        )
+        if let placement = pendingAudioPlacement {
+            editor.placeGeneratingAudioClip(
+                placeholderId: assetId,
+                startFrame: placement.startFrame,
+                spanSeconds: placement.spanSeconds,
+                actionName: placement.actionName
+            )
+        }
+        if let placement = transitionPlacement {
+            editor.placeGeneratingTransitionClip(placeholderId: assetId, placement: placement)
+        }
         if plan.replacementClipId == nil {
             editor.selectMediaPanelItem(assetId)
         }
@@ -622,13 +813,32 @@ extension GenerationView {
 
     private func populatePanel(asset: MediaAsset, stored: GenerationInput) {
         if stored.generationProvider == GenerationProvider.fal.rawValue {
-            guard let idx = FALPreviewCatalog.shared.image.firstIndex(where: {
-                $0.id == stored.model
-            }) else { return }
             isPopulatingPanel = true
             selectedProvider = .fal
-            selectedType = .image
-            selectedImageModelIndex = idx
+            if let idx = FALPreviewCatalog.shared.video.firstIndex(where: {
+                $0.id == stored.model
+            }) {
+                selectedType = .video
+                selectedVideoModelIndex = idx
+            } else if let idx = FALPreviewCatalog.shared.image.firstIndex(where: {
+                $0.id == stored.model
+            }) {
+                selectedType = .image
+                selectedImageModelIndex = idx
+            } else if let idx = FALPreviewCatalog.shared.audio.firstIndex(where: {
+                $0.id == stored.model
+            }) {
+                selectedType = .audio
+                selectedAudioModelIndex = idx
+            } else if let idx = FALPreviewCatalog.shared.upscale.firstIndex(where: {
+                $0.id == stored.model
+            }) {
+                selectedType = .upscale
+                selectedUpscaleModelIndex = idx
+            } else {
+                isPopulatingPanel = false
+                return
+            }
         } else {
             switch ModelRegistry.byId[stored.model] {
             case .video:

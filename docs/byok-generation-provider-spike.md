@@ -1,62 +1,74 @@
-# BYOK generation provider spike
+# BYOK generation provider
 
-This branch prototypes the generation UX before any provider calls, secret
-storage, billing, or queue handling are implemented.
+This branch adds `fal.ai · BYOK` as an execution provider beside Palmier Cloud.
+The model vendor and the execution provider remain separate concepts: a Google,
+OpenAI, ByteDance, Kuaishou, ElevenLabs, or Topaz model can be executed and
+billed through fal.ai.
 
-## UX decision
+The provider selector lives in the trailing action area of the generation
+toolbar, next to the cost estimate and submit button. Palmier Cloud stays
+disabled in preview builds that do not contain Palmier's backend
+configuration.
 
-The generation panel treats these as separate concepts:
+## Connected workflows
 
-- **Execution provider** — who receives the request and bills it (`Palmier` or
-  `fal.ai`).
-- **Model vendor** — who made the selected model (`Google`, `ByteDance`,
-  `OpenAI`, `ElevenLabs`, and others).
-
-The provider is selected first. The existing Image, Video, Audio, and Upscale
-flows then display a provider-specific model catalog and reuse Palmier's
-capability-driven controls.
-
-The selector lives in the existing trailing action area of the prompt toolbar,
-next to credit estimation and submit/sign-in. This keeps Palmier's header
-available for project activity and close controls. The FAL label includes
-`BYOK`, so the separate credit-estimate position is hidden for that provider.
-
-The `fal.ai` submit button is deliberately disabled and marked as a preview.
-Selecting it cannot submit a request or spend credits.
-
-## Preview scope
-
-| Workflow | Models represented in the preview | Controls exercised |
+| Workflow | Connected models | Inputs and controls |
 | --- | --- | --- |
-| Image | Nano Banana 2, GPT Image 2, FLUX.2 | resolution, aspect ratio, quality, references |
-| Video | Seedance 2.0 Fast, Seedance 2.0, Kling 3.0 Standard, Veo 3.1 | duration, resolution, aspect ratio, first/last frame, image/video/audio references |
-| Audio | ElevenLabs TTS, Music, Sound Effects, Audio Isolation, Dubbing | voice, duration, instrumental mode, source media, target language |
-| Upscale | Topaz Image, Topaz Video, SeedVR2 | source type, resolution, frame rate, enhancement model |
+| Image | Nano Banana 2, GPT Image 2, FLUX.2 | text generation, image editing with references, resolution/aspect/quality, multiple outputs where supported |
+| Video | Seedance 2.0 Fast, Seedance 2.0, Kling 3.0 Standard, Veo 3.1 | text-to-video, first/last frame where supported, Seedance image/video/audio references, duration, resolution, aspect ratio, generated audio |
+| Audio | ElevenLabs v3 TTS, Music, Sound Effects, Audio Isolation, Dubbing | voice, duration, instrumental mode, audio/video source media, target language |
+| Upscale | Topaz Image, Topaz Video, SeedVR2 | image/video source media, target resolution, frame rate, Topaz enhancement model |
 
-This is a deliberately curated catalog for UX validation, not a complete
-mirror of the FAL model directory. Endpoint names and parameter mappings must
-be verified against the live FAL schemas when the backend adapter is built.
+The catalog is intentionally curated rather than mirroring every fal.ai
+endpoint. Every model shown in this catalog has an endpoint-specific request
+mapper; unsupported controls are not advertised.
 
-## Next implementation slice
+## Request lifecycle
 
-After the UX is approved:
+1. Palmier validates the selected model, input media, and endpoint-specific
+   limits locally.
+2. It computes a USD estimate from the currently documented fal.ai billing
+   unit and asks for explicit confirmation.
+3. Local reference/source media is converted, trimmed, or compressed where
+   required and uploaded to fal.ai's CDN. Large files use multipart uploads.
+4. The app submits to the fal.ai queue, stores the endpoint and request ID in
+   the project, polls the job, and can reconstruct an interrupted queue job
+   after relaunch.
+5. Completed media is downloaded and imported through Palmier's existing
+   project-media pipeline.
 
-1. Store the API key in macOS Keychain and keep it out of project files and
-   logs.
-2. Add a `GenerationBackend` implementation for FAL with a small,
-   endpoint-specific request mapper.
-3. Upload local reference media and submit through the FAL queue API.
-4. Poll job state, support cancellation, download the result, and import it
-   through Palmier's existing media pipeline.
-5. Fetch or maintain pricing metadata and show a pre-submit estimate.
+Uploaded inputs and generated outputs request a 24-hour fal.ai CDN lifetime.
+Queue request metadata follows the fal.ai account/service retention policy so
+an interrupted request can be resumed.
 
-Direct vendor adapters should only be added for features that FAL does not
-expose, such as account-specific voice-library or voice-cloning workflows.
+## Keys, privacy, and billing
+
+- The API key is stored in macOS Keychain and is never written into the
+  project, app bundle, logs, repository, or DMG.
+- The preview app reads the key only when it uploads media or calls the fal.ai
+  queue.
+- Reference and source media is sent to fal.ai only after the user confirms
+  the displayed estimate.
+- The estimate is a safety preview, not a billing guarantee. fal.ai bills the
+  user's account directly and may change prices or round billing units.
+- The app does not make a paid test request during build or automated tests.
+
+An ad-hoc preview build has no stable Developer ID signature. macOS may ask for
+Keychain access again when the executable identity changes between builds.
+That prompt is expected to disappear once builds use a stable signed app
+identity.
 
 ## Internal preview build
 
 `scripts/package-byok-preview.sh` creates an isolated, ad-hoc signed test DMG.
-The preview uses a separate bundle identifier and display name, disables
-Sparkle updates, defaults to fal.ai, and keeps Palmier Cloud disabled when its
-backend configuration is not part of the build. It contains no API key and
-cannot submit FAL jobs yet.
+It uses a separate bundle identifier and display name, disables Sparkle
+updates, defaults to fal.ai, and contains no API key.
+
+The `BYOK Preview` GitHub workflow packages the DMG for pushes to
+`ongrow/**`. Automated tests exercise validation, request construction, cost
+calculation, storage URL handling, result parsing, and the connected catalog
+without contacting a paid model endpoint.
+
+Developers using Command Line Tools without the full Xcode Metal toolchain can
+set `PALMIER_SKIP_METAL_PLUGIN=1` for non-rendering local checks. A complete
+build still requires the full Xcode version supported by Palmier.

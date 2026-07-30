@@ -5,6 +5,9 @@ import PackagePlugin
 @main
 struct MetalCIKernelPlugin: BuildToolPlugin {
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        if ProcessInfo.processInfo.environment["PALMIER_SKIP_METAL_PLUGIN"] == "1" {
+            return []
+        }
         let metalDir = context.package.directoryURL.appending(path: "Metal")
         let names = (try? FileManager.default.contentsOfDirectory(atPath: metalDir.path()))?
             .filter { $0.hasSuffix(".metal") } ?? []
