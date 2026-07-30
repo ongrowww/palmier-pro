@@ -1,5 +1,28 @@
 import Foundation
 
+enum FALProblemCheck: Equatable, Sendable {
+    case queued(position: Int?)
+    case inProgress
+    case completed
+    case failed(message: String)
+
+    var technicalDescription: String {
+        switch self {
+        case .queued(let position):
+            if let position {
+                return "FAL status: queued (position \(position))"
+            }
+            return "FAL status: queued"
+        case .inProgress:
+            return "FAL status: in progress"
+        case .completed:
+            return "FAL status: completed successfully"
+        case .failed(let message):
+            return "FAL result: \(message)"
+        }
+    }
+}
+
 struct FALFailureDiagnosis: Equatable, Sendable {
     let title: String
     let explanation: String
@@ -54,5 +77,30 @@ struct FALFailureDiagnosis: Equatable, Sendable {
             explanation: "The provider returned an error for this request.",
             recovery: "Review the technical details below, adjust the input, or try another model."
         )
+    }
+
+    static func make(check: FALProblemCheck) -> Self {
+        switch check {
+        case .queued:
+            return Self(
+                title: "The request is still queued",
+                explanation: "FAL has accepted the request but has not started processing it.",
+                recovery: "Wait a moment, then check the problem again."
+            )
+        case .inProgress:
+            return Self(
+                title: "The request is still processing",
+                explanation: "FAL is currently generating the requested media.",
+                recovery: "Wait for the generation to finish, then check again."
+            )
+        case .completed:
+            return Self(
+                title: "FAL completed the request",
+                explanation: "FAL no longer reports a generation error for this request.",
+                recovery: "Use Retry Download if available. Otherwise, run the generation again."
+            )
+        case .failed(let message):
+            return make(error: message)
+        }
     }
 }

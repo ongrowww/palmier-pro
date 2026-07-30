@@ -10,6 +10,10 @@ struct PreviewContainerView: View {
     @State private var hoveredTabId: String?
     @State private var failedImagePreviewKey: String?
     @State private var showingFailureDiagnosis = false
+    @State private var isCheckingFailure = false
+    @State private var checkedFALProblem: FALProblemCheck?
+    @State private var failureCheckError: String?
+    @State private var failureCheckID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -83,6 +87,11 @@ struct PreviewContainerView: View {
         .background(AppTheme.Background.surfaceColor)
         .onChange(of: editor.activePreviewTabId) { _, _ in
             editor.cancelChromaKeySampling()
+            showingFailureDiagnosis = false
+            isCheckingFailure = false
+            checkedFALProblem = nil
+            failureCheckError = nil
+            failureCheckID = nil
         }
     }
 
@@ -437,25 +446,68 @@ struct PreviewContainerView: View {
         """
     }
 
-    private static func generationFailureDetails(asset: MediaAsset, error: String) -> String {
+    private static func generationFailureDetails(
+        asset: MediaAsset,
+        error: String,
+        check: FALProblemCheck?
+    ) -> String {
         let input = asset.generationInput
         let provider = input?.generationProvider ?? "(unknown)"
         let model = input?.model ?? "(unknown)"
         let endpoint = input?.backendEndpoint ?? "(unknown)"
         let requestID = input?.backendJobId ?? "(not submitted)"
-        let safeError = error
-            .split(whereSeparator: \.isWhitespace)
-            .map { $0.contains("://") ? "[redacted URL]" : String($0) }
-            .joined(separator: " ")
-            .prefix(1_000)
+        let safeError = safeDiagnosticText(error)
+        let checkedResult = check.map { "\n\($0.technicalDescription)" } ?? ""
 
         return """
         Provider: \(provider)
         Model: \(model)
         Endpoint: \(endpoint)
         Request ID: \(requestID)
-        Error: \(safeError)
+        Stored error: \(safeError)\(checkedResult)
         """
+    }
+
+    private static func safeDiagnosticText(_ text: String) -> String {
+        String(text
+            .split(whereSeparator: \.isWhitespace)
+            .map { $0.contains("://") ? "[redacted URL]" : String($0) }
+            .joined(separator: " ")
+            .prefix(1_000))
+    }
+
+    private static func canCheckFALProblem(_ asset: MediaAsset) -> Bool {
+        guard let input = asset.generationInput else { return false }
+        return input.generationProvider == GenerationProvider.fal.rawValue
+            && input.backendEndpoint?.isEmpty == false
+            && input.backendJobId?.isEmpty == false
+    }
+
+    private func checkFailureProblem(asset: MediaAsset) {
+        showingFailureDiagnosis = true
+        checkedFALProblem = nil
+        failureCheckError = nil
+
+        guard Self.canCheckFALProblem(asset) else { return }
+        isCheckingFailure = true
+        let assetID = asset.id
+        let checkID = UUID()
+        failureCheckID = checkID
+        Task { @MainActor in
+            defer {
+                if failureCheckID == checkID {
+                    isCheckingFailure = false
+                }
+            }
+            do {
+                let result = try await editor.generationService.checkFALProblem(asset: asset)
+                guard activeMediaAsset?.id == assetID, failureCheckID == checkID else { return }
+                checkedFALProblem = result
+            } catch {
+                guard activeMediaAsset?.id == assetID, failureCheckID == checkID else { return }
+                failureCheckError = Self.safeDiagnosticText(error.localizedDescription)
+            }
+        }
     }
 
     private func offlinePreview(assetId: String?, path: String?, isUnprocessable: Bool) -> some View {
@@ -551,18 +603,34 @@ struct PreviewContainerView: View {
                             .overlay(Capsule().strokeBorder(.white.opacity(AppTheme.Opacity.muted), lineWidth: AppTheme.BorderWidth.hairline))
                         }
                         Button {
-                            showingFailureDiagnosis = true
+                            checkFailureProblem(asset: asset)
                         } label: {
                             HStack(spacing: AppTheme.Spacing.xs) {
-                                Image(systemName: "stethoscope")
-                                Text("Check Problem")
+                                if isCheckingFailure {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "stethoscope")
+                                }
+                                Text(isCheckingFailure ? "Checking…" : "Check Problem")
                             }
                         }
                         .buttonStyle(.capsule(.secondary, size: .regular))
+                        .disabled(isCheckingFailure)
                         .popover(isPresented: $showingFailureDiagnosis, arrowEdge: .bottom) {
+                            let diagnosis = checkedFALProblem.map { FALFailureDiagnosis.make(check: $0) }
+                                ?? FALFailureDiagnosis.make(error: error)
                             FALFailureDiagnosisPopover(
-                                diagnosis: FALFailureDiagnosis.make(error: error),
-                                details: Self.generationFailureDetails(asset: asset, error: error)
+                                diagnosis: diagnosis,
+                                check: checkedFALProblem,
+                                isChecking: isCheckingFailure,
+                                checkError: failureCheckError,
+                                checksFALRemotely: Self.canCheckFALProblem(asset),
+                                details: Self.generationFailureDetails(
+                                    asset: asset,
+                                    error: error,
+                                    check: checkedFALProblem
+                                )
                             )
                         }
                     }
@@ -830,6 +898,10 @@ private enum ZoomPreset: CaseIterable {
 
 private struct FALFailureDiagnosisPopover: View {
     let diagnosis: FALFailureDiagnosis
+    let check: FALProblemCheck?
+    let isChecking: Bool
+    let checkError: String?
+    let checksFALRemotely: Bool
     let details: String
 
     @State private var showingTechnicalDetails = false
@@ -837,9 +909,9 @@ private struct FALFailureDiagnosisPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.mdLg) {
             HStack(alignment: .top, spacing: AppTheme.Spacing.smMd) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: statusIcon)
                     .font(.system(size: AppTheme.FontSize.lg))
-                    .foregroundStyle(AppTheme.Status.errorColor)
+                    .foregroundStyle(statusColor)
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
                     Text(diagnosis.title)
                         .font(.system(size: AppTheme.FontSize.md, weight: .semibold))
@@ -849,6 +921,31 @@ private struct FALFailureDiagnosisPopover: View {
                         .foregroundStyle(AppTheme.Text.secondaryColor)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+
+            if isChecking {
+                HStack(spacing: AppTheme.Spacing.sm) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Checking the existing request with FAL…")
+                }
+                .font(.system(size: AppTheme.FontSize.sm))
+                .foregroundStyle(AppTheme.Text.secondaryColor)
+            } else if let checkError {
+                HStack(alignment: .top, spacing: AppTheme.Spacing.xs) {
+                    Image(systemName: "wifi.exclamationmark")
+                    Text("Unable to check FAL: \(checkError)")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.system(size: AppTheme.FontSize.xs))
+                .foregroundStyle(AppTheme.Status.errorColor)
+            } else if check != nil {
+                HStack(spacing: AppTheme.Spacing.xs) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("Checked with FAL")
+                }
+                .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
+                .foregroundStyle(AppTheme.Status.successColor)
             }
 
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
@@ -884,13 +981,32 @@ private struct FALFailureDiagnosisPopover: View {
 
             HStack(spacing: AppTheme.Spacing.xs) {
                 Image(systemName: "lock")
-                Text("This check runs locally. Nothing is sent.")
+                Text(checksFALRemotely
+                    ? "Uses the existing request ID. No prompt or media is uploaded."
+                    : "Uses the stored error details. Nothing is sent.")
             }
             .font(.system(size: AppTheme.FontSize.xs))
             .foregroundStyle(AppTheme.Text.tertiaryColor)
         }
         .padding(AppTheme.Spacing.lg)
         .frame(width: 380)
+    }
+
+    private var statusIcon: String {
+        switch check {
+        case .some(.queued): "clock.fill"
+        case .some(.inProgress): "hourglass"
+        case .some(.completed): "checkmark.circle.fill"
+        case .some(.failed), .none: "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var statusColor: Color {
+        switch check {
+        case .some(.queued), .some(.inProgress): AppTheme.Status.warningColor
+        case .some(.completed): AppTheme.Status.successColor
+        case .some(.failed), .none: AppTheme.Status.errorColor
+        }
     }
 }
 

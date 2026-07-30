@@ -27,6 +27,33 @@ final class GenerationService {
         let tempFiles: [URL]
     }
 
+    enum FALProblemCheckError: LocalizedError {
+        case missingMetadata
+
+        var errorDescription: String? {
+            switch self {
+            case .missingMetadata:
+                "This generation does not contain a FAL endpoint and request ID."
+            }
+        }
+    }
+
+    func checkFALProblem(asset: MediaAsset) async throws -> FALProblemCheck {
+        guard let input = asset.generationInput,
+              input.generationProvider == GenerationProvider.fal.rawValue,
+              let endpoint = input.backendEndpoint,
+              let requestID = input.backendJobId,
+              !endpoint.isEmpty,
+              !requestID.isEmpty else {
+            throw FALProblemCheckError.missingMetadata
+        }
+        let submission = try FALQueueRequestBuilder.submission(
+            endpoint: endpoint,
+            requestId: requestID
+        )
+        return try await falQueueClient.checkProblem(for: submission)
+    }
+
     @discardableResult
     func generate(
         genInput: GenerationInput,

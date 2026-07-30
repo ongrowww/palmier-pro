@@ -333,6 +333,24 @@ actor FALQueueClient {
         return try await result(for: submission, apiKey: apiKey)
     }
 
+    func checkProblem(for submission: FALQueueSubmission) async throws -> FALProblemCheck {
+        let apiKey = try await credentials.apiKey()
+        let current = try await status(for: submission, apiKey: apiKey)
+        switch current.status {
+        case .inQueue:
+            return .queued(position: current.queuePosition)
+        case .inProgress:
+            return .inProgress
+        case .completed:
+            do {
+                _ = try await result(for: submission, apiKey: apiKey)
+                return .completed
+            } catch let error as FALClientError {
+                return .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
     func waitForResult(
         _ submission: FALQueueSubmission,
         maximumPollCount: Int = 1_800

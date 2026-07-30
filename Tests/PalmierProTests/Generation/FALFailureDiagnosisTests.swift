@@ -23,4 +23,16 @@ struct FALFailureDiagnosisTests {
         #expect(FALFailureDiagnosis.make(error: "failed [HTTP 503]").title
             == "FAL is temporarily unavailable")
     }
+
+    @Test func explainsLiveQueueStates() {
+        #expect(FALFailureDiagnosis.make(check: .queued(position: 2)).title
+            == "The request is still queued")
+        #expect(FALFailureDiagnosis.make(check: .inProgress).title
+            == "The request is still processing")
+        #expect(FALFailureDiagnosis.make(check: .completed).title
+            == "FAL completed the request")
+        #expect(FALFailureDiagnosis.make(check: .failed(
+            message: "Rejected [content_policy_violation, HTTP 422]"
+        )).title == "This model rejected the input")
+    }
 }
