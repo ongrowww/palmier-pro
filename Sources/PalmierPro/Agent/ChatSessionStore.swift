@@ -17,7 +17,7 @@ struct ChatSession: Codable, Identifiable {
         title: String = "New chat",
         messages: [AgentMessage] = [],
         isOpen: Bool = true,
-        provider: AgentProviderID = .palmier,
+        provider: AgentProviderID = .codex,
         externalThreadID: String? = nil,
         selectedModelID: String? = nil,
         selectedReasoningEffort: String? = nil,

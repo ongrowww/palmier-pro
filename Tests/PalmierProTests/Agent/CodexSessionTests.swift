@@ -4,6 +4,10 @@ import Testing
 
 @Suite("CodexSession")
 struct CodexSessionTests {
+    @Test func newSessionDefaultsToCodex() {
+        #expect(ChatSession().provider == .codex)
+    }
+
     @Test func legacySessionDefaultsToPalmier() throws {
         let id = UUID()
         let json = """
