@@ -200,6 +200,7 @@ struct CatalogEntry: Decodable, Sendable {
         id: String,
         kind: Kind,
         displayName: String,
+        providerIconKey: String? = nil,
         providerName: String? = nil,
         description: String? = nil,
         allowedEndpoints: [String],
@@ -217,6 +218,7 @@ struct CatalogEntry: Decodable, Sendable {
         self.id = id
         self.kind = kind
         self.displayName = displayName
+        self.providerIconKey = providerIconKey
         self.providerName = providerName
         self.description = description
         self.allowedEndpoints = allowedEndpoints
