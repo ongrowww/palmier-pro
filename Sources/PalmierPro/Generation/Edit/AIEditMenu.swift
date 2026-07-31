@@ -62,6 +62,7 @@ struct AIEditMenu: View {
     }
 
     private var aiAllowed: Bool {
+        if !BackendConfig.palmierCloudAvailable { return true }
         let account = AccountService.shared
         return account.isSignedIn && !account.isMisconfigured
     }
@@ -88,7 +89,8 @@ struct AIEditMenu: View {
         action: EditAction,
         perform: @escaping () -> Void
     ) -> some View {
-        if action.requiresPaidPlan && !AccountService.shared.isPaid {
+        if BackendConfig.palmierCloudAvailable
+            && action.requiresPaidPlan && !AccountService.shared.isPaid {
             Button {
                 SettingsWindowController.shared.show(tab: .account)
             } label: {

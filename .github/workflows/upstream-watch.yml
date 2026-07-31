@@ -71,7 +71,7 @@ jobs:
               "$conflicts" \
               "\`\`\`" \
               "" \
-              "Resolve the merge on a temporary branch, run CI and the BYOK preview build, then merge it into \`${TARGET_BRANCH}\`.")"
+              "Resolve the merge on a temporary branch, review every new upstream AI feature for BYOK parity, run CI and the BYOK preview build, then merge it into \`${TARGET_BRANCH}\`.")"
             issue_number="$(gh issue list --repo "$REPOSITORY" --state open \
               --search "${conflict_issue_title} in:title" --json number --jq '.[0].number // empty')"
             if [ -n "$issue_number" ]; then
@@ -98,7 +98,11 @@ jobs:
             "This PR was created by the upstream watcher after a conflict-free merge of \`${UPSTREAM_REPOSITORY}/${UPSTREAM_BRANCH}\` into \`${TARGET_BRANCH}\`. It remains a draft until CI, the BYOK preview build, and manual smoke tests pass." \
             "" \
             "## Testing" \
-            "Automated CI and preview packaging run on this PR/branch. Manually verify FAL generation, Check Problem, and a Codex chat before marking it ready." \
+            "Automated CI and preview packaging run on this PR/branch. Before marking it ready:" \
+            "- [ ] Review the upstream changelog, model catalog, and AI edit actions for new or changed AI features." \
+            "- [ ] Map each applicable feature to a documented BYOK endpoint and cost model, or explicitly document why it remains unavailable." \
+            "- [ ] Add or update request, validation, pricing, and catalog tests for every BYOK mapping." \
+            "- [ ] Manually verify the affected FAL workflows, Check Problem, and a Codex chat." \
             "" \
             "## Change statistics" \
             "See the GitHub file summary for the upstream delta.")"

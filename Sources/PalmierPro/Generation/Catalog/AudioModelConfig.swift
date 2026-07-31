@@ -72,7 +72,11 @@ struct AudioModelConfig: Identifiable, Sendable {
     }
 
     @MainActor
-    static var allModels: [AudioModelConfig] { ModelCatalog.shared.audio }
+    static var allModels: [AudioModelConfig] {
+        BackendConfig.palmierCloudAvailable
+            ? ModelCatalog.shared.audio
+            : FALPreviewCatalog.shared.audio
+    }
 
     let entry: CatalogEntry
     let caps: AudioCaps

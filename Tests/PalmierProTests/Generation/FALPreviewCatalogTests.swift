@@ -35,6 +35,24 @@ struct FALPreviewCatalogTests {
         #expect(categories.contains(.dubbing))
     }
 
+    @Test func exposesReframeAndLipSyncCapabilities() throws {
+        let reframe = try #require(FALPreviewCatalog.shared.video.first {
+            $0.id == "fal-ai/ltx-2.3/reframe"
+        })
+        #expect(reframe.requiresSourceVideo)
+        #expect(!reframe.supportsPrompt)
+        #expect(reframe.maxSourceVideoSeconds == 60)
+        #expect(reframe.aspectRatios == ["1:1", "4:5", "5:4", "9:16", "16:9"])
+
+        let lipSync = try #require(FALPreviewCatalog.shared.video.first {
+            $0.id == "veed/lipsync/v2"
+        })
+        #expect(lipSync.isLipSync)
+        #expect(lipSync.requiresSourceVideo)
+        #expect(lipSync.requiresReferenceAudio)
+        #expect(lipSync.maxReferenceAudios == 1)
+    }
+
     @Test func connectsEveryAdvertisedFALModel() {
         let catalog = FALPreviewCatalog.shared
         #expect(Set(catalog.video.map(\.id)) == FALVideoGenerationPlanner.supportedModelIds)

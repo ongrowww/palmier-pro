@@ -23,6 +23,18 @@ struct FALMediaGenerationPlanTests {
             resolution: "4k",
             generateAudio: true
         ) == 4_800_000)
+        #expect(try FALVideoGenerationPlanner.estimatedCostMicroUSD(
+            modelId: "fal-ai/ltx-2.3/reframe",
+            duration: 10,
+            resolution: "1080p",
+            generateAudio: false
+        ) == 2_000_000)
+        #expect(try FALVideoGenerationPlanner.estimatedCostMicroUSD(
+            modelId: "veed/lipsync/v2",
+            duration: 10,
+            resolution: nil,
+            generateAudio: false
+        ) == 700_000)
     }
 
     @Test func pricesAudioModelsUsingTheirBillingUnits() throws {
@@ -153,6 +165,86 @@ struct FALMediaGenerationPlanTests {
         #expect(veoPlan.endpoint == "fal-ai/veo3.1/image-to-video")
         #expect(veoPlan.input["duration"] == .string("6s"))
         #expect(veoPlan.uploads.first?.target == .scalar("image_url"))
+    }
+
+    @Test @MainActor func mapsReframeAndLipSyncSourceWorkflows() throws {
+        let source = MediaAsset(
+            url: URL(fileURLWithPath: "/tmp/source.mov"),
+            type: .video,
+            name: "Source",
+            duration: 10
+        )
+        let audio = MediaAsset(
+            url: URL(fileURLWithPath: "/tmp/replacement.wav"),
+            type: .audio,
+            name: "Replacement Audio",
+            duration: 8
+        )
+        let trim = TrimmedSource(
+            sourceURL: source.url,
+            trimStartFrame: 30,
+            trimEndFrame: 150,
+            sourceFramesConsumed: 120,
+            fps: 30
+        )
+
+        let reframe = try #require(FALPreviewCatalog.shared.video.first {
+            $0.id == "fal-ai/ltx-2.3/reframe"
+        })
+        let reframePlan = try FALVideoGenerationPlanner.makePlan(
+            generationInput: GenerationInput(
+                prompt: "",
+                model: reframe.id,
+                duration: 4,
+                aspectRatio: "9:16",
+                resolution: "720p"
+            ),
+            model: reframe,
+            inputAssets: .init(sourceVideo: source),
+            trimmedSource: trim,
+            generateAudio: false,
+            folderId: nil,
+            replacementClipId: "clip-1"
+        )
+        #expect(reframePlan.endpoint == "fal-ai/ltx-2.3/reframe")
+        #expect(reframePlan.input["aspect_ratio"] == .string("9:16"))
+        #expect(reframePlan.input["resolution"] == .string("720p"))
+        #expect(reframePlan.uploads.first?.target == .scalar("video_url"))
+        #expect(reframePlan.estimatedCostMicroUSD == 400_000)
+        #expect(reframePlan.generationInput.imageURLAssetIds == [source.id])
+        if let preparation = reframePlan.uploads.first?.preparation {
+            if case .trimVideo = preparation {
+                // Expected: only the visible timeline range is uploaded.
+            } else {
+                Issue.record("Expected the source video to be trimmed")
+            }
+        } else {
+            Issue.record("Expected a source video upload")
+        }
+
+        let lipSync = try #require(FALPreviewCatalog.shared.video.first {
+            $0.id == "veed/lipsync/v2"
+        })
+        let lipSyncPlan = try FALVideoGenerationPlanner.makePlan(
+            generationInput: GenerationInput(
+                prompt: "",
+                model: lipSync.id,
+                duration: 8,
+                aspectRatio: "",
+                resolution: nil
+            ),
+            model: lipSync,
+            inputAssets: .init(sourceVideo: source, audioRefs: [audio]),
+            generateAudio: false,
+            folderId: nil,
+            replacementClipId: "clip-1"
+        )
+        #expect(lipSyncPlan.endpoint == "veed/lipsync/v2")
+        #expect(lipSyncPlan.input.isEmpty)
+        #expect(lipSyncPlan.uploads.map(\.target) == [
+            .scalar("video_url"), .scalar("audio_url"),
+        ])
+        #expect(lipSyncPlan.estimatedCostMicroUSD == 560_000)
     }
 
     @Test @MainActor func mapsAudioGenerationAndSourceWorkflows() throws {

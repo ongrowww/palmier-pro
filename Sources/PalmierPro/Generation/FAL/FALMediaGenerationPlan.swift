@@ -107,6 +107,8 @@ enum FALVideoGenerationPlanner {
         "bytedance/seedance-2.0",
         "fal-ai/kling-video/v3/standard",
         "fal-ai/veo3.1",
+        "fal-ai/ltx-2.3/reframe",
+        "veed/lipsync/v2",
     ])
 
     @MainActor
@@ -114,6 +116,7 @@ enum FALVideoGenerationPlanner {
         generationInput baseInput: GenerationInput,
         model: VideoModelConfig,
         inputAssets: VideoGenerationSubmission.InputAssets,
+        trimmedSource: TrimmedSource? = nil,
         generateAudio: Bool,
         folderId: String?,
         replacementClipId: String?
@@ -122,13 +125,16 @@ enum FALVideoGenerationPlanner {
             throw FALMediaGenerationError.unsupportedModel
         }
         let prompt = baseInput.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty else { throw FALMediaGenerationError.emptyPrompt }
+        if model.supportsPrompt, prompt.isEmpty {
+            throw FALMediaGenerationError.emptyPrompt
+        }
 
         var generationInput = baseInput
         generationInput.generationProvider = GenerationProvider.fal.rawValue
         generationInput.generateAudio = generateAudio
-        generationInput.imageURLAssetIds = inputAssets.frames.isEmpty
-            ? nil : inputAssets.frames.map(\.id)
+        let visualInputs = inputAssets.sourceVideo.map { [$0] } ?? inputAssets.frames
+        generationInput.imageURLAssetIds = visualInputs.isEmpty
+            ? nil : visualInputs.map(\.id)
         generationInput.referenceImageAssetIds = inputAssets.imageRefs.isEmpty
             ? nil : inputAssets.imageRefs.map(\.id)
         generationInput.referenceVideoAssetIds = inputAssets.videoRefs.isEmpty
@@ -234,6 +240,44 @@ enum FALVideoGenerationPlanner {
                 endpoint = model.id
             }
 
+        case "fal-ai/ltx-2.3/reframe":
+            guard let source = inputAssets.sourceVideo,
+                  (1...60).contains(duration),
+                  let resolution,
+                  ["720p", "1080p"].contains(resolution),
+                  ["1:1", "4:5", "5:4", "9:16", "16:9"].contains(aspectRatio),
+                  inputAssets.frames.isEmpty,
+                  inputAssets.allRefs.isEmpty
+            else { throw FALMediaGenerationError.invalidSettings }
+            endpoint = model.id
+            request = [
+                "aspect_ratio": .string(aspectRatio),
+                "resolution": .string(resolution),
+            ]
+            uploads.append(upload(
+                source,
+                target: .scalar("video_url"),
+                preparation: sourcePreparation(source: source, trimmedSource: trimmedSource)
+            ))
+
+        case "veed/lipsync/v2":
+            guard let source = inputAssets.sourceVideo,
+                  duration > 0,
+                  inputAssets.frames.isEmpty,
+                  inputAssets.imageRefs.isEmpty,
+                  inputAssets.videoRefs.isEmpty,
+                  inputAssets.audioRefs.count == 1,
+                  let audio = inputAssets.audioRefs.first
+            else { throw FALMediaGenerationError.invalidSettings }
+            endpoint = model.id
+            request = [:]
+            uploads.append(upload(
+                source,
+                target: .scalar("video_url"),
+                preparation: sourcePreparation(source: source, trimmedSource: trimmedSource)
+            ))
+            uploads.append(upload(audio, target: .scalar("audio_url")))
+
         default:
             throw FALMediaGenerationError.unsupportedModel
         }
@@ -294,6 +338,15 @@ enum FALVideoGenerationPlanner {
                 return duration * (generateAudio ? 600_000 : 400_000)
             }
             return duration * (generateAudio ? 400_000 : 200_000)
+        case "fal-ai/ltx-2.3/reframe":
+            guard let resolution else { throw FALMediaGenerationError.invalidSettings }
+            switch resolution {
+            case "720p": return duration * 100_000
+            case "1080p": return duration * 200_000
+            default: throw FALMediaGenerationError.invalidSettings
+            }
+        case "veed/lipsync/v2":
+            return duration * 70_000
         default:
             throw FALMediaGenerationError.unsupportedModel
         }
@@ -313,6 +366,17 @@ enum FALVideoGenerationPlanner {
             "aspect_ratio": .string(aspectRatio),
             "generate_audio": .bool(generateAudio),
         ]
+    }
+
+    @MainActor
+    private static func sourcePreparation(
+        source: MediaAsset,
+        trimmedSource: TrimmedSource?
+    ) -> FALMediaUpload.Preparation {
+        guard let trimmedSource,
+              trimmedSource.sourceURL == source.url,
+              trimmedSource.hasTrim else { return .none }
+        return .trimVideo(trimmedSource)
     }
 
     @MainActor

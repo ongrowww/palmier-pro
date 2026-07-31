@@ -141,6 +141,47 @@ struct FALPreviewCatalog {
             totalReferences: 0,
             exclusiveModes: false
         ),
+        video(
+            id: "fal-ai/ltx-2.3/reframe",
+            name: "LTX 2.3 Reframe",
+            vendor: "Lightricks",
+            endpoints: ["fal-ai/ltx-2.3/reframe"],
+            durations: [],
+            resolutions: ["720p", "1080p"],
+            aspectRatios: ["1:1", "4:5", "5:4", "9:16", "16:9"],
+            firstFrame: false,
+            lastFrame: false,
+            referenceImages: 0,
+            referenceVideos: 0,
+            referenceAudios: 0,
+            totalReferences: 0,
+            exclusiveModes: false,
+            supportsPrompt: false,
+            requiresSourceVideo: true,
+            maxSourceVideoSeconds: 60,
+            audioDiscountRate: nil
+        ),
+        video(
+            id: "veed/lipsync/v2",
+            name: "VEED Lip Sync v2",
+            vendor: "VEED",
+            endpoints: ["veed/lipsync/v2"],
+            durations: [],
+            resolutions: nil,
+            aspectRatios: [],
+            firstFrame: false,
+            lastFrame: false,
+            referenceImages: 0,
+            referenceVideos: 0,
+            referenceAudios: 1,
+            totalReferences: 1,
+            exclusiveModes: false,
+            supportsPrompt: false,
+            requiresSourceVideo: true,
+            maxCombinedAudioRefSeconds: nil,
+            requiresReferenceAudio: true,
+            audioDiscountRate: nil
+        ),
         audio(
             id: "fal-ai/elevenlabs/tts/eleven-v3",
             name: "ElevenLabs v3 TTS",
@@ -343,7 +384,13 @@ struct FALPreviewCatalog {
         referenceVideos: Int,
         referenceAudios: Int,
         totalReferences: Int,
-        exclusiveModes: Bool
+        exclusiveModes: Bool,
+        supportsPrompt: Bool = true,
+        requiresSourceVideo: Bool = false,
+        maxSourceVideoSeconds: Double? = nil,
+        maxCombinedAudioRefSeconds: Double? = 15,
+        requiresReferenceAudio: Bool = false,
+        audioDiscountRate: [String: Double]? = ["": 1]
     ) -> CatalogEntry {
         CatalogEntry(
             id: id,
@@ -353,7 +400,7 @@ struct FALPreviewCatalog {
             allowedEndpoints: endpoints,
             responseShape: .video,
             uiCapabilities: .video(VideoCaps(
-                supportsPrompt: true,
+                supportsPrompt: supportsPrompt,
                 durations: durations,
                 resolutions: resolutions,
                 aspectRatios: aspectRatios,
@@ -364,17 +411,17 @@ struct FALPreviewCatalog {
                 maxReferenceAudios: referenceAudios,
                 maxTotalReferences: totalReferences,
                 maxCombinedVideoRefSeconds: 15,
-                maxCombinedAudioRefSeconds: 15,
+                maxCombinedAudioRefSeconds: maxCombinedAudioRefSeconds,
                 framesAndReferencesExclusive: exclusiveModes,
                 referenceTagNoun: "Image",
-                requiresSourceVideo: false,
-                maxSourceVideoSeconds: nil,
+                requiresSourceVideo: requiresSourceVideo,
+                maxSourceVideoSeconds: maxSourceVideoSeconds,
                 maxSourceVideoResolution: nil,
                 requiredSourceVideoEncoding: nil,
                 requiresReferenceImage: false,
-                requiresReferenceAudio: false
+                requiresReferenceAudio: requiresReferenceAudio
             )),
-            audioDiscountRate: ["": 1]
+            audioDiscountRate: audioDiscountRate
         )
     }
 

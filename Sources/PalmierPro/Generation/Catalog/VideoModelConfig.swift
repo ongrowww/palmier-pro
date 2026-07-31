@@ -6,7 +6,11 @@ func unsupportedValue(model displayName: String, field: String, value: String, a
 
 struct VideoModelConfig: Identifiable, Sendable {
     @MainActor
-    static var allModels: [VideoModelConfig] { ModelCatalog.shared.video }
+    static var allModels: [VideoModelConfig] {
+        BackendConfig.palmierCloudAvailable
+            ? ModelCatalog.shared.video
+            : FALPreviewCatalog.shared.video
+    }
 
     @MainActor
     static var edit: VideoModelConfig? {

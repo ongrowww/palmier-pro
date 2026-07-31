@@ -15,7 +15,7 @@ configuration.
 | Workflow | Connected models | Inputs and controls |
 | --- | --- | --- |
 | Image | Nano Banana 2, GPT Image 2, FLUX.2 | text generation, image editing with references, resolution/aspect/quality, multiple outputs where supported |
-| Video | Seedance 2.0 Fast, Seedance 2.0, Kling 3.0 Standard, Veo 3.1 | text-to-video, first/last frame where supported, Seedance image/video/audio references, duration, resolution, aspect ratio, generated audio |
+| Video | Seedance 2.0 Fast, Seedance 2.0, Kling 3.0 Standard, Veo 3.1, LTX 2.3 Reframe, VEED Lip Sync v2 | text-to-video, first/last frame where supported, Seedance image/video/audio references, LTX video reframing, VEED replacement-audio lip sync, duration, resolution, aspect ratio, generated audio |
 | Audio | ElevenLabs v3 TTS, Music, Sound Effects, Audio Isolation, Dubbing | voice, duration, instrumental mode, audio/video source media, target language |
 | Upscale | Topaz Image, Topaz Video, SeedVR2 | image/video source media, target resolution, frame rate, Topaz enhancement model |
 
@@ -90,7 +90,12 @@ fetches `palmier-io/palmier-pro:main` and then follows one of two paths:
 
 Before accepting a sync pull request, manually verify one FAL generation, the
 `Check Problem` lookup for a stored request ID, and one Codex chat against a
-saved project. The workflow never merges a pull request by itself.
+saved project. Also review the upstream changelog, model catalog, and AI edit
+actions for every new or changed AI feature. Each applicable feature must be
+mapped to a documented BYOK endpoint with local validation, cost estimation,
+request tests, and a manual smoke test, or be explicitly documented as
+unavailable. A conflict-free merge and green CI alone do not establish BYOK
+feature parity. The workflow never merges a pull request by itself.
 
 Scheduled and manual runs become available after this workflow exists on the
 fork's default branch. Until then, compare and merge `upstream/main` from the

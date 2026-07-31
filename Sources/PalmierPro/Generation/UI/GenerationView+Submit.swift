@@ -322,6 +322,7 @@ extension GenerationView {
                     generationInput: input,
                     model: videoModel,
                     inputAssets: assets,
+                    trimmedSource: editor.pendingEditTrimmedSource,
                     generateAudio: effectiveGenerateAudio,
                     folderId: editFolderId
                         ?? assets.textToVideoReferences.last?.folderId
@@ -528,8 +529,13 @@ extension GenerationView {
             let inputAssets = videoInputAssets(for: videoModel)
             let modelError: String?
             if videoModel.requiresSourceVideo {
+                let validatesOutputFormat = videoModel.id.contains("reframe")
                 modelError = videoModel.validateSourceDuration(effectiveSourceVideoSeconds)
-                    ?? videoModel.validate(duration: 0, aspectRatio: "", resolution: nil)
+                    ?? videoModel.validate(
+                        duration: 0,
+                        aspectRatio: validatesOutputFormat ? selectedAspectRatio : "",
+                        resolution: validatesOutputFormat ? effectiveResolution : nil
+                    )
             } else {
                 modelError = videoModel.validate(
                     duration: selectedDuration,

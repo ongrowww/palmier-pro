@@ -76,7 +76,11 @@ struct UpscalePricing: Decodable, Sendable {
 
 struct UpscaleModelConfig: Identifiable, Sendable {
     @MainActor
-    static var allModels: [UpscaleModelConfig] { ModelCatalog.shared.upscale }
+    static var allModels: [UpscaleModelConfig] {
+        BackendConfig.palmierCloudAvailable
+            ? ModelCatalog.shared.upscale
+            : FALPreviewCatalog.shared.upscale
+    }
 
     @MainActor
     static func models(for type: ClipType) -> [UpscaleModelConfig] {

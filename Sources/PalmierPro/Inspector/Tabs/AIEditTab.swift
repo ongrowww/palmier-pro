@@ -220,7 +220,8 @@ struct AIEditTab: View {
             for: asset,
             effectiveDurationOverride: effectiveDurationForAvailability
         )
-        let paidBlocked = action.requiresPaidPlan && !account.isPaid
+        let paidBlocked = BackendConfig.palmierCloudAvailable
+            && action.requiresPaidPlan && !account.isPaid
         let isEnabled = availability.isAvailable && !paidBlocked && aiDisabledReason == nil
         let disabledReason = aiDisabledReason
             ?? (paidBlocked ? "Requires a paid plan" : availability.reason)
@@ -254,7 +255,8 @@ struct AIEditTab: View {
             for: asset,
             effectiveDurationOverride: effectiveDurationForAvailability
         )
-        let paidBlocked = model?.paidOnly == true && !account.isPaid
+        let paidBlocked = BackendConfig.palmierCloudAvailable
+            && model?.paidOnly == true && !account.isPaid
         let isEnabled = availability.isAvailable && !paidBlocked && aiDisabledReason == nil
         let disabledReason = aiDisabledReason
             ?? (paidBlocked ? "Requires a paid plan" : availability.reason)
@@ -426,6 +428,7 @@ struct AIEditTab: View {
     private var shouldReplace: Bool { replaceClipSource && clipId != nil }
 
     private var aiDisabledReason: String? {
+        if !BackendConfig.palmierCloudAvailable { return nil }
         if account.isMisconfigured { return "AI is unavailable" }
         if !account.isSignedIn { return "Sign in to use AI" }
         return nil

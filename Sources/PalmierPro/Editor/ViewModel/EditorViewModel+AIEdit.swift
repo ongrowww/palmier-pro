@@ -137,12 +137,17 @@ extension EditorViewModel {
         audioPlacement: PendingAudioPlacement? = nil,
         transitionPlacement: PendingTransitionPlacement? = nil
     ) {
+        var providerAwareInput = stored
+        if providerAwareInput.generationProvider == nil,
+           GenerationProvider.defaultProvider == .fal {
+            providerAwareInput.generationProvider = GenerationProvider.fal.rawValue
+        }
         if transitionPlacement == nil { cancelPendingTransitionSeed() }
         pendingEditReplacementClipId = replacementClipId
         pendingEditTrimmedSource = trimmedSource
         pendingEditAudioPlacement = audioPlacement
         pendingEditTransitionPlacement = transitionPlacement
-        pendingPanelSeed = PendingPanelSeed(asset: asset, stored: stored)
+        pendingPanelSeed = PendingPanelSeed(asset: asset, stored: providerAwareInput)
         showGenerationPanel = true
     }
 

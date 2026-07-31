@@ -26,7 +26,11 @@ struct ImageGenerationParams: Encodable, Sendable {
 
 struct ImageModelConfig: Identifiable, Sendable {
     @MainActor
-    static var allModels: [ImageModelConfig] { ModelCatalog.shared.image }
+    static var allModels: [ImageModelConfig] {
+        BackendConfig.palmierCloudAvailable
+            ? ModelCatalog.shared.image
+            : FALPreviewCatalog.shared.image
+    }
 
     @MainActor
     static var nanoBananaPro: ImageModelConfig? {
