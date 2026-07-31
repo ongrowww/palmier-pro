@@ -51,8 +51,10 @@ jobs:
 
           upstream_sha="$(git rev-parse "$upstream_ref")"
           target_sha="$(git rev-parse HEAD)"
+          integrated_upstream_sha="$(git merge-base HEAD "$upstream_ref")"
           branch="ongrow/upstream-${upstream_sha:0:7}-onto-${target_sha:0:7}"
           conflict_issue_title="[upstream] Palmier update requires conflict resolution"
+          audit_report="$(scripts/report-upstream-ai-changes.sh "$integrated_upstream_sha" "$upstream_ref")"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -71,6 +73,8 @@ jobs:
               "$conflicts" \
               "\`\`\`" \
               "" \
+              "$audit_report" \
+              "" \
               "Resolve the merge on a temporary branch, review every new upstream AI feature for BYOK parity, run CI and the BYOK preview build, then merge it into \`${TARGET_BRANCH}\`.")"
             issue_number="$(gh issue list --repo "$REPOSITORY" --state open \
               --search "${conflict_issue_title} in:title" --json number --jq '.[0].number // empty')"
@@ -83,6 +87,10 @@ jobs:
             exit 1
           fi
 
+          audit_path="docs/upstream-audits/${upstream_sha}.md"
+          mkdir -p "$(dirname "$audit_path")"
+          scripts/report-upstream-ai-changes.sh "$integrated_upstream_sha" "$upstream_ref" > "$audit_path"
+          git add "$audit_path"
           git commit -m "[build] Merge upstream main into thin fork"
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             echo "Sync branch $branch already exists."
@@ -98,11 +106,8 @@ jobs:
             "This PR was created by the upstream watcher after a conflict-free merge of \`${UPSTREAM_REPOSITORY}/${UPSTREAM_BRANCH}\` into \`${TARGET_BRANCH}\`. It remains a draft until CI, the BYOK preview build, and manual smoke tests pass." \
             "" \
             "## Testing" \
-            "Automated CI and preview packaging run on this PR/branch. Before marking it ready:" \
-            "- [ ] Review the upstream changelog, model catalog, and AI edit actions for new or changed AI features." \
-            "- [ ] Map each applicable feature to a documented BYOK endpoint and cost model, or explicitly document why it remains unavailable." \
-            "- [ ] Add or update request, validation, pricing, and catalog tests for every BYOK mapping." \
-            "- [ ] Manually verify the affected FAL workflows, Check Problem, and a Codex chat." \
+            "Automated CI and preview packaging run on this PR/branch." \
+            "The added parity audit at \`${audit_path}\` must be completed with a supported decision, concrete evidence, and test notes. The Upstream Parity Audit check remains red while any review item or placeholder is unresolved." \
             "" \
             "## Change statistics" \
             "See the GitHub file summary for the upstream delta.")"
