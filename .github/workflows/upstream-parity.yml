@@ -1,0 +1,38 @@
+name: Upstream Parity Audit
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate upstream AI parity audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate audit decision
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
+          audit_files="$(git diff --diff-filter=A --name-only "origin/${BASE_REF}...HEAD" -- 'docs/upstream-audits/*.md')"
+
+          if [[ "$HEAD_REF" == ongrow/upstream-* && -z "$audit_files" ]]; then
+            echo "An automated upstream sync must add a parity audit." >&2
+            exit 1
+          fi
+
+          if [ -z "$audit_files" ]; then
+            echo "No new upstream parity audit in this pull request."
+            exit 0
+          fi
+
+          scripts/validate-upstream-ai-audit.sh $audit_files

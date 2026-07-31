@@ -106,8 +106,17 @@ fetches `palmier-io/palmier-pro:main` and then follows one of two paths:
 - A conflict-free merge creates a draft `ongrow/upstream-*` pull request. CI
   and the BYOK preview build must pass before it is merged.
 - A conflicting merge creates or updates an issue assigned to `Schrobo` with
-  the exact conflicting files. It never resolves or merges conflicts
-  automatically.
+  the exact conflicting files and the same AI-surface report. Fork Issues must
+  remain enabled so this escalation path stays operational. The watcher never
+  resolves or merges conflicts automatically.
+
+Every conflict-free sync branch also adds
+`docs/upstream-audits/<upstream-sha>.md`. The report is generated from the
+upstream-only commit range and lists relevant upstream commits, changed
+generation/AI-edit/Agent files, and added changelog content. A separate
+`Upstream Parity Audit` check requires all six review items plus one supported
+decision, concrete evidence, and test notes. It intentionally fails while the
+generated placeholders remain unresolved.
 
 Before accepting a sync pull request, manually verify one FAL generation, the
 `Check Problem` lookup for a stored request ID, and one Codex chat against a
@@ -115,9 +124,10 @@ saved project. Also review the upstream changelog, model catalog, and AI edit
 actions for every new or changed AI feature. Each applicable feature must be
 mapped to a documented BYOK endpoint with local validation, cost estimation,
 request tests, and a manual smoke test, or be explicitly documented as
-unavailable. A conflict-free merge and green CI alone do not establish BYOK
-feature parity. The workflow never merges a pull request by itself.
+unavailable. The audit decision is one of `no BYOK work required`, `BYOK
+changes implemented`, or `feature explicitly unavailable`. A conflict-free
+merge and green build/test jobs alone do not establish BYOK feature parity.
+The workflow never merges a pull request by itself.
 
-Scheduled and manual runs become available after this workflow exists on the
-fork's default branch. Until then, compare and merge `upstream/main` from the
-integration branch directly.
+Scheduled and manual runs are active because the workflow exists on the fork's
+default branch. Fork Issues are enabled for conflict escalation.
