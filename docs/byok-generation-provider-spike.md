@@ -73,6 +73,27 @@ Developers using Command Line Tools without the full Xcode Metal toolchain can
 set `PALMIER_SKIP_METAL_PLUGIN=1` for non-rendering local checks. A complete
 build still requires the full Xcode version supported by Palmier.
 
+## Manual validation
+
+The ad-hoc BYOK preview was manually validated on 2026-08-01 with a real
+fal.ai account and imported test media:
+
+- Image generation and image editing with reference media completed and
+  returned importable results.
+- Video generation with supported reference controls completed and returned
+  an importable result.
+- `Check Problem` exposed an actionable diagnosis for a failed fal.ai request
+  instead of only displaying the HTTP status.
+- A Codex chat started from Palmier, used Codex as the default provider, and
+  interacted with the open project.
+- LTX 2.3 Reframe converted a landscape clip successfully.
+- VEED Lip Sync v2 synchronized a frontal talking-head clip to an independent
+  human speech recording successfully.
+
+These are user-confirmed smoke tests, not automated paid endpoint tests. Model
+availability, pricing, and remote behavior can still change independently of
+the app.
+
 ## Thin-fork maintenance
 
 `ongrow/codex-provider` is the integration branch for the complete OnGROW
