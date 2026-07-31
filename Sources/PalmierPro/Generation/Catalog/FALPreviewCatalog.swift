@@ -353,6 +353,7 @@ struct FALPreviewCatalog {
             allowedEndpoints: endpoints,
             responseShape: .video,
             uiCapabilities: .video(VideoCaps(
+                supportsPrompt: true,
                 durations: durations,
                 resolutions: resolutions,
                 aspectRatios: aspectRatios,
@@ -367,8 +368,11 @@ struct FALPreviewCatalog {
                 framesAndReferencesExclusive: exclusiveModes,
                 referenceTagNoun: "Image",
                 requiresSourceVideo: false,
+                maxSourceVideoSeconds: nil,
                 maxSourceVideoResolution: nil,
-                requiresReferenceImage: false
+                requiredSourceVideoEncoding: nil,
+                requiresReferenceImage: false,
+                requiresReferenceAudio: false
             )),
             audioDiscountRate: ["": 1]
         )
