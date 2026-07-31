@@ -54,6 +54,18 @@ Generate videos and images with SOTA models like Seedance, Kling, Nano Banana Pr
 
 Connects your Claude/Codex/Cursor via MCP, or use the in-app agent to work on the same project together.
 
+### In-app Codex (OnGROW fork)
+
+The agent panel can use a locally installed, signed-in Codex CLI as its provider. Choose **Codex** in a new chat, then select the model, reasoning effort, and service tier exposed by the installed CLI. Palmier keeps the Codex thread ID with the project so the chat can continue after reopening it.
+
+Palmier starts `codex app-server` directly, gives it a minimal environment, and routes its dynamic tool calls to the same project-bound editor tools used by the built-in agent. Codex itself owns authentication; API keys and `~/.codex/auth.json` are never copied into the project. Commands, file changes, and additional permissions require an explicit in-app decision.
+
+If Palmier cannot find `codex`, open **Settings → Agent** to choose the executable. Sign in from Terminal with:
+
+```bash
+codex login
+```
+
 ## MCP server
 
 When the app is open, it exposes an MCP server at `http://127.0.0.1:19789/mcp` via HTTP. To connect:

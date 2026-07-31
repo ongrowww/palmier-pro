@@ -1,0 +1,123 @@
+name: Upstream Watch
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-watch
+  cancel-in-progress: false
+
+env:
+  TARGET_BRANCH: ongrow/codex-provider
+  UPSTREAM_REPOSITORY: palmier-io/palmier-pro
+  UPSTREAM_BRANCH: main
+  UPSTREAM_ASSIGNEE: Schrobo
+
+jobs:
+  check:
+    name: Check palmier-io updates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          git fetch --no-tags upstream "${UPSTREAM_BRANCH}"
+
+      - name: Prepare sync pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          upstream_ref="upstream/${UPSTREAM_BRANCH}"
+          behind="$(git rev-list --count "HEAD..${upstream_ref}")"
+          if [ "$behind" -eq 0 ]; then
+            echo "${TARGET_BRANCH} already contains ${upstream_ref}."
+            exit 0
+          fi
+
+          upstream_sha="$(git rev-parse "$upstream_ref")"
+          target_sha="$(git rev-parse HEAD)"
+          branch="ongrow/upstream-${upstream_sha:0:7}-onto-${target_sha:0:7}"
+          conflict_issue_title="[upstream] Palmier update requires conflict resolution"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if ! git merge --no-commit --no-ff "$upstream_ref"; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            git merge --abort
+            body="$(printf '%s\n' \
+              "Palmier upstream has ${behind} new commit(s), but the thin-fork merge conflicts." \
+              "" \
+              "Target: \`${TARGET_BRANCH}\` at \`${target_sha}\`" \
+              "Upstream: \`${UPSTREAM_REPOSITORY}/${UPSTREAM_BRANCH}\` at \`${upstream_sha}\`" \
+              "" \
+              "Conflicting files:" \
+              "\`\`\`" \
+              "$conflicts" \
+              "\`\`\`" \
+              "" \
+              "Resolve the merge on a temporary branch, review every new upstream AI feature for BYOK parity, run CI and the BYOK preview build, then merge it into \`${TARGET_BRANCH}\`.")"
+            issue_number="$(gh issue list --repo "$REPOSITORY" --state open \
+              --search "${conflict_issue_title} in:title" --json number --jq '.[0].number // empty')"
+            if [ -n "$issue_number" ]; then
+              gh issue edit "$issue_number" --repo "$REPOSITORY" --body "$body" --add-assignee "$UPSTREAM_ASSIGNEE"
+            else
+              gh issue create --repo "$REPOSITORY" --title "$conflict_issue_title" \
+                --body "$body" --assignee "$UPSTREAM_ASSIGNEE"
+            fi
+            exit 1
+          fi
+
+          git commit -m "[build] Merge upstream main into thin fork"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "Sync branch $branch already exists."
+          else
+            git push origin "HEAD:${branch}"
+          fi
+
+          body="$(printf '%s\n' \
+            "## Summary" \
+            "Merge ${behind} new upstream commit(s) into the OnGROW thin fork." \
+            "" \
+            "## Approach" \
+            "This PR was created by the upstream watcher after a conflict-free merge of \`${UPSTREAM_REPOSITORY}/${UPSTREAM_BRANCH}\` into \`${TARGET_BRANCH}\`. It remains a draft until CI, the BYOK preview build, and manual smoke tests pass." \
+            "" \
+            "## Testing" \
+            "Automated CI and preview packaging run on this PR/branch. Before marking it ready:" \
+            "- [ ] Review the upstream changelog, model catalog, and AI edit actions for new or changed AI features." \
+            "- [ ] Map each applicable feature to a documented BYOK endpoint and cost model, or explicitly document why it remains unavailable." \
+            "- [ ] Add or update request, validation, pricing, and catalog tests for every BYOK mapping." \
+            "- [ ] Manually verify the affected FAL workflows, Check Problem, and a Codex chat." \
+            "" \
+            "## Change statistics" \
+            "See the GitHub file summary for the upstream delta.")"
+          existing_pr="$(gh pr list --repo "$REPOSITORY" --state open --head "$branch" \
+            --json number --jq '.[0].number // empty')"
+          if [ -n "$existing_pr" ]; then
+            echo "Sync PR #$existing_pr already exists."
+          else
+            gh pr create --repo "$REPOSITORY" --draft --base "$TARGET_BRANCH" --head "$branch" \
+              --title "[build] Merge Palmier upstream ${upstream_sha:0:7}" --body "$body"
+          fi
+
+          conflict_issue="$(gh issue list --repo "$REPOSITORY" --state open \
+            --search "${conflict_issue_title} in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$conflict_issue" ]; then
+            gh issue close "$conflict_issue" --repo "$REPOSITORY" \
+              --comment "A conflict-free upstream sync PR is now available."
+          fi

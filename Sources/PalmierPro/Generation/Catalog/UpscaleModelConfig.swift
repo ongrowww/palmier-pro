@@ -76,7 +76,11 @@ struct UpscalePricing: Decodable, Sendable {
 
 struct UpscaleModelConfig: Identifiable, Sendable {
     @MainActor
-    static var allModels: [UpscaleModelConfig] { ModelCatalog.shared.upscale }
+    static var allModels: [UpscaleModelConfig] {
+        BackendConfig.palmierCloudAvailable
+            ? ModelCatalog.shared.upscale
+            : FALPreviewCatalog.shared.upscale
+    }
 
     @MainActor
     static func models(for type: ClipType) -> [UpscaleModelConfig] {
@@ -157,6 +161,11 @@ struct UpscaleModelConfig: Identifiable, Sendable {
     }
 
     private func targetLongEdge(_ value: String) -> Int {
-        value == "1080p" ? 1920 : 3840
+        switch value {
+        case "720p": 1280
+        case "1080p": 1920
+        case "1440p": 2560
+        default: 3840
+        }
     }
 }

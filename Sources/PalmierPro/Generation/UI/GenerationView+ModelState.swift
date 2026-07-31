@@ -4,15 +4,24 @@ struct VideoModelProviderGroup: Identifiable {
     let name: String
     let models: [(index: Int, model: VideoModelConfig)]
     var id: String { name }
+    var providerIconKey: String? { models.first?.model.entry.providerIconKey }
 }
 
 // Model catalog selection and per-model capability state.
 extension GenerationView {
 
-    var videoModels: [VideoModelConfig] { ModelCatalog.shared.video }
-    var imageModels: [ImageModelConfig] { ModelCatalog.shared.image }
-    var audioModels: [AudioModelConfig] { ModelCatalog.shared.audio }
-    var upscaleModels: [UpscaleModelConfig] { ModelCatalog.shared.upscale }
+    var videoModels: [VideoModelConfig] {
+        selectedProvider == .palmierCloud ? ModelCatalog.shared.video : FALPreviewCatalog.shared.video
+    }
+    var imageModels: [ImageModelConfig] {
+        selectedProvider == .palmierCloud ? ModelCatalog.shared.image : FALPreviewCatalog.shared.image
+    }
+    var audioModels: [AudioModelConfig] {
+        selectedProvider == .palmierCloud ? ModelCatalog.shared.audio : FALPreviewCatalog.shared.audio
+    }
+    var upscaleModels: [UpscaleModelConfig] {
+        selectedProvider == .palmierCloud ? ModelCatalog.shared.upscale : FALPreviewCatalog.shared.upscale
+    }
 
     var videoModel: VideoModelConfig { selectedModel(videoModels, at: selectedVideoModelIndex) }
     var imageModel: ImageModelConfig { selectedModel(imageModels, at: selectedImageModelIndex) }
@@ -30,9 +39,10 @@ extension GenerationView {
         upscaleModels.isEmpty ? GenerationType.allCases.filter { $0 != .upscale } : GenerationType.allCases
     }
 
-    var aiAllowed: Bool { account.aiAllowed }
+    var aiAllowed: Bool { selectedProvider == .palmierCloud && account.aiAllowed }
 
     var currentModelLocked: Bool {
+        guard selectedProvider == .palmierCloud else { return false }
         guard !account.isPaid else { return false }
         switch selectedType {
         case .video: return videoModel.paidOnly
@@ -47,7 +57,9 @@ extension GenerationView {
         return models[safeIndex]
     }
 
-    private func isAvailable(_ paidOnly: Bool) -> Bool { account.isPaid || !paidOnly }
+    private func isAvailable(_ paidOnly: Bool) -> Bool {
+        selectedProvider != .palmierCloud || account.isPaid || !paidOnly
+    }
 
     var enabledVideoModels: [(index: Int, model: VideoModelConfig)] {
         videoModels.enumerated()
@@ -130,7 +142,12 @@ extension GenerationView {
         return audioSource.type == .video ? .video : .audio
     }
     var showsPrompt: Bool {
-        selectedType != .upscale && (selectedType != .audio || audioModel.inputs.contains(.text))
+        switch selectedType {
+        case .video: videoModel.supportsPrompt
+        case .audio: audioModel.inputs.contains(.text)
+        case .image: true
+        case .upscale: false
+        }
     }
 
     var initialAudioTargetLanguage: String {
@@ -227,14 +244,22 @@ extension GenerationView {
         }
     }
 
-    var effectiveVideoSeconds: Int {
-        guard videoModel.requiresSourceVideo else { return selectedDuration }
+    var effectiveSourceVideoSeconds: Double {
+        guard videoModel.requiresSourceVideo else { return Double(selectedDuration) }
         if let trim = editor.pendingEditTrimmedSource,
            let sv = sourceVideo,
            trim.sourceURL == sv.url, trim.hasTrim {
-            return max(1, Int(trim.durationSeconds.rounded()))
+            return trim.durationSeconds
         }
-        return max(0, Int((sourceVideo?.duration ?? 0).rounded()))
+        return sourceVideo?.resolvedDuration ?? 0
+    }
+
+    var effectiveVideoSeconds: Int {
+        guard videoModel.requiresSourceVideo else { return selectedDuration }
+        return videoModel.billingDurationSeconds(
+            sourceVideoDuration: effectiveSourceVideoSeconds,
+            sourceAudioDuration: refAudios.first?.resolvedDuration
+        ) ?? 0
     }
 
     var effectiveAudioSourceSpanSeconds: Double {

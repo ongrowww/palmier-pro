@@ -5,8 +5,10 @@ struct GenerationView: View {
 
     @Environment(EditorViewModel.self) var editor
     @Bindable var account = AccountService.shared
+    @Bindable var falCredentials = FALCredentialState.shared
     @State var prompt = ""
     @State var selectedType: GenerationType = .video
+    @State var selectedProvider: GenerationProvider = .defaultProvider
     @State var selectedVideoModelIndex = 0
     @State var selectedImageModelIndex = 0
     @State var selectedAudioModelIndex = 0
@@ -71,6 +73,7 @@ struct GenerationView: View {
 
     @State var dropError: String? = nil
     @State var dropErrorTask: Task<Void, Never>? = nil
+    @State var pendingFALConfirmation: FALGenerationConfirmation? = nil
 
     @AppStorage("generationPromptExtra") private var promptExtra: Double = 0
     @State private var liveExtra: Double?
@@ -150,6 +153,16 @@ struct GenerationView: View {
         .onChange(of: upscaleModels.isEmpty) { _, isEmpty in
             if isEmpty && selectedType == .upscale { selectedType = .video }
         }
+        .alert(item: $pendingFALConfirmation) { plan in
+            Alert(
+                title: Text("Generate with fal.ai?"),
+                message: Text(plan.confirmationMessage),
+                primaryButton: .default(Text("Generate · \(plan.estimatedCostLabel)")) {
+                    submitConfirmedFALGeneration(plan)
+                },
+                secondaryButton: .cancel()
+            )
+        }
     }
 
     private var catalogLoadingView: some View {
@@ -165,7 +178,7 @@ struct GenerationView: View {
         .overlay {
             RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous)
                 .strokeBorder(
-                    Color.white.opacity(AppTheme.Opacity.hint),
+                    AppTheme.Interaction.fill(AppTheme.Opacity.hint),
                     lineWidth: AppTheme.BorderWidth.hairline
                 )
                 .allowsHitTesting(false)
@@ -251,7 +264,7 @@ struct GenerationView: View {
                 .strokeBorder(
                     isPromptFocused
                         ? AppTheme.Accent.primary.opacity(AppTheme.Opacity.medium)
-                        : Color.white.opacity(AppTheme.Opacity.hint),
+                        : AppTheme.Interaction.fill(AppTheme.Opacity.hint),
                     lineWidth: isPromptFocused ? AppTheme.BorderWidth.thin : AppTheme.BorderWidth.hairline
                 )
                 .allowsHitTesting(false)
@@ -261,6 +274,7 @@ struct GenerationView: View {
         .padding(.bottom, AppTheme.Spacing.sm)
         .frame(maxHeight: max(0, CGFloat(maxPanelHeight)), alignment: .top)
         .onAppear {
+            falCredentials.refresh()
             let hadSeed = editor.pendingPanelSeed != nil
             consumePendingPanelSeed()
             // A seeded edit may reuse a now-disabled model; keep its selection.
@@ -281,6 +295,19 @@ struct GenerationView: View {
             resetSettings()
             clearReferences()
             if newValue == .audio { resetAudioState() }
+            editFolderId = nil
+            editor.clearPendingGenerationPanelState(preservingReplacement: true)
+        }
+        .onChange(of: selectedProvider) { _, _ in
+            guard !isPopulatingPanel else { return }
+            selectedVideoModelIndex = 0
+            selectedImageModelIndex = 0
+            selectedAudioModelIndex = 0
+            selectedUpscaleModelIndex = 0
+            normalizeModelSelection()
+            resetSettings()
+            clearReferences()
+            if selectedType == .audio { resetAudioState() }
             editFolderId = nil
             editor.clearPendingGenerationPanelState(preservingReplacement: true)
         }
@@ -343,7 +370,7 @@ struct GenerationView: View {
 
     private var resizeHandle: some View {
         Capsule()
-            .fill(Color.white.opacity(AppTheme.Opacity.soft))
+            .fill(AppTheme.Interaction.fill(AppTheme.Opacity.soft))
             .frame(width: 24, height: 2)
             .frame(maxWidth: .infinity, minHeight: AppTheme.Spacing.md)
             .contentShape(Rectangle())
@@ -401,7 +428,7 @@ struct GenerationView: View {
     // MARK: - Secondary fields (lyrics / style instructions)
 
     private var inputDivider: some View {
-        Rectangle().fill(Color.white.opacity(AppTheme.Opacity.hint)).frame(height: AppTheme.BorderWidth.hairline)
+        Rectangle().fill(AppTheme.Interaction.fill(AppTheme.Opacity.hint)).frame(height: AppTheme.BorderWidth.hairline)
     }
 
     private func secondaryField(
@@ -446,6 +473,7 @@ struct GenerationView: View {
 
             Spacer(minLength: AppTheme.Spacing.xs)
 
+            providerPicker
             costEstimateLabel
             submitButton
         }

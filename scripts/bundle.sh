@@ -4,20 +4,42 @@ set -euo pipefail
 # Usage:
 #   scripts/bundle.sh [release|debug]           # ad-hoc signed dev build
 #   scripts/bundle.sh debug --fast              # fastest: skip dSYM + deep sign, just env+build
+#   scripts/bundle.sh debug --speech             # include bundled speech and MLX
+#   scripts/bundle.sh debug --telemetry          # include production telemetry
+#   scripts/bundle.sh debug --all                # include all optional traits
 #   scripts/bundle.sh release --sign            # build + Developer ID codesign
 #   scripts/bundle.sh release --dist            # build + sign + notarize + staple + DMG
+#   scripts/bundle.sh debug --byok-preview       # ad-hoc OnGROW preview without Palmier Cloud
 
 CONFIG="release"
 MODE="dev"
+BYOK_PREVIEW=false
+INCLUDE_BUNDLED_SPEECH=false
+INCLUDE_PRODUCTION_TELEMETRY=false
 for arg in "$@"; do
   case "$arg" in
     release|debug) CONFIG="$arg" ;;
     --fast)        MODE="fast" ;;
     --sign)        MODE="sign" ;;
     --dist)        MODE="dist" ;;
+    --speech)      INCLUDE_BUNDLED_SPEECH=true ;;
+    --telemetry)   INCLUDE_PRODUCTION_TELEMETRY=true ;;
+    --all)
+      INCLUDE_BUNDLED_SPEECH=true
+      INCLUDE_PRODUCTION_TELEMETRY=true
+      ;;
+    --byok-preview)
+      BYOK_PREVIEW=true
+      INCLUDE_BUNDLED_SPEECH=true
+      ;;
     *) echo "unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
+
+if [ "$CONFIG" = "release" ]; then
+  INCLUDE_BUNDLED_SPEECH=true
+  INCLUDE_PRODUCTION_TELEMETRY=true
+fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -46,12 +68,30 @@ APP="$ROOT/.build/PalmierPro.app"
 ZIP="$ROOT/.build/PalmierPro.zip"
 DMG="$ROOT/.build/PalmierPro.dmg"
 
-echo "==> Building ($CONFIG)"
-TRAITS="BundledSpeech"
-if [ "$CONFIG" = "release" ]; then
-  TRAITS="$TRAITS,ProductionTelemetry"
+BUILD_ARGS=(-c "$CONFIG")
+TRAITS=""
+if $INCLUDE_BUNDLED_SPEECH; then
+  TRAITS="BundledSpeech"
 fi
-BUILD_ARGS=(-c "$CONFIG" --traits "$TRAITS")
+if $INCLUDE_PRODUCTION_TELEMETRY; then
+  if [ -n "$TRAITS" ]; then
+    TRAITS="$TRAITS,ProductionTelemetry"
+  else
+    TRAITS="ProductionTelemetry"
+  fi
+fi
+if [ "$BYOK_PREVIEW" = true ]; then
+  if [ -n "$TRAITS" ]; then
+    TRAITS="$TRAITS,BYOKPreview"
+  else
+    TRAITS="BYOKPreview"
+  fi
+fi
+if [ -n "$TRAITS" ]; then
+  BUILD_ARGS+=(--traits "$TRAITS")
+fi
+
+echo "==> Building ($CONFIG, traits: ${TRAITS:-none})"
 swift build "${BUILD_ARGS[@]}"
 BIN="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)/PalmierPro"
 SPARKLE_FW="$ROOT/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
@@ -61,6 +101,15 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN" "$APP/Contents/MacOS/PalmierPro"
 cp "$RESOURCES/Info.plist" "$APP/Contents/Info.plist"
+
+if [ "$BYOK_PREVIEW" = true ]; then
+  echo "==> Configuring isolated BYOK preview bundle"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier de.ongrow.palmier-pro.byok-preview" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Palmier Pro BYOK Preview" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleName Palmier Pro BYOK Preview" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :SUEnableAutomaticChecks false" "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Delete :SUFeedURL" "$APP/Contents/Info.plist"
+fi
 
 if [ -n "$SENTRY_DSN" ]; then
   echo "==> Injecting SentryDSN into Info.plist"
@@ -150,17 +199,19 @@ if ! ls "$RES_BUNDLE"/*.metallib >/dev/null 2>&1; then
 fi
 cp "$RES_BUNDLE"/*.metallib "$APP/Contents/Resources/"
 
-MLX_METALLIB="$ROOT/.build/$CONFIG/mlx.metallib"
-if [ ! -f "$MLX_METALLIB" ]; then
-  echo "==> Building MLX metallib ($CONFIG)"
-  BUILD_DIR="$ROOT/.build" "$ROOT/.build/checkouts/speech-swift/scripts/build_mlx_metallib.sh" "$CONFIG"
+if $INCLUDE_BUNDLED_SPEECH; then
+  MLX_METALLIB="$ROOT/.build/$CONFIG/mlx.metallib"
+  if [ ! -f "$MLX_METALLIB" ]; then
+    echo "==> Building MLX metallib ($CONFIG)"
+    BUILD_DIR="$ROOT/.build" "$ROOT/.build/checkouts/speech-swift/scripts/build_mlx_metallib.sh" "$CONFIG"
+  fi
+  if [ ! -f "$MLX_METALLIB" ]; then
+    echo "!! missing $MLX_METALLIB — on-device speech features (VAD, speaker ID) would die silently" >&2
+    exit 1
+  fi
+  mkdir -p "$APP/Contents/Resources/mlx-swift_Cmlx.bundle"
+  cp "$MLX_METALLIB" "$APP/Contents/Resources/mlx-swift_Cmlx.bundle/default.metallib"
 fi
-if [ ! -f "$MLX_METALLIB" ]; then
-  echo "!! missing $MLX_METALLIB — on-device speech features (VAD, speaker ID) would die silently" >&2
-  exit 1
-fi
-mkdir -p "$APP/Contents/Resources/mlx-swift_Cmlx.bundle"
-cp "$MLX_METALLIB" "$APP/Contents/Resources/mlx-swift_Cmlx.bundle/default.metallib"
 
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/PalmierPro"
 touch "$APP"

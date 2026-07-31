@@ -19,10 +19,39 @@ final class GenerationService {
 
     private static let uploadCacheTTL: TimeInterval = 6 * 24 * 60 * 60
     private var resumedBackendJobIds: Set<String> = []
+    private let falQueueClient = FALQueueClient()
+    private let falStorageClient = FALStorageClient()
 
     private struct PreparedReferences {
         let uploaded: [String]
         let tempFiles: [URL]
+    }
+
+    enum FALProblemCheckError: LocalizedError {
+        case missingMetadata
+
+        var errorDescription: String? {
+            switch self {
+            case .missingMetadata:
+                "This generation does not contain a FAL endpoint and request ID."
+            }
+        }
+    }
+
+    func checkFALProblem(asset: MediaAsset) async throws -> FALProblemCheck {
+        guard let input = asset.generationInput,
+              input.generationProvider == GenerationProvider.fal.rawValue,
+              let endpoint = input.backendEndpoint,
+              let requestID = input.backendJobId,
+              !endpoint.isEmpty,
+              !requestID.isEmpty else {
+            throw FALProblemCheckError.missingMetadata
+        }
+        let submission = try FALQueueRequestBuilder.submission(
+            endpoint: endpoint,
+            requestId: requestID
+        )
+        return try await falQueueClient.checkProblem(for: submission)
     }
 
     @discardableResult
@@ -124,6 +153,267 @@ final class GenerationService {
         return primaryId
     }
 
+    @discardableResult
+    func generateFALImage(
+        plan: FALImageGenerationPlan,
+        projectURL: URL?,
+        editor: EditorViewModel,
+        onComplete: (@MainActor (MediaAsset) -> Void)? = nil,
+        onFailure: (@MainActor () -> Void)? = nil
+    ) -> String {
+        let count = max(1, min(4, plan.numImages))
+        let baseName = String(plan.generationInput.prompt.prefix(30))
+        let resolvedFolderId = plan.folderId.flatMap { id in
+            editor.folder(id: id) != nil ? id : nil
+        }
+        let destination = Self.destinationDirectory(for: projectURL)
+        var placeholders: [MediaAsset] = []
+
+        for outputIndex in 0..<count {
+            var input = plan.generationInput
+            input.outputIndex = outputIndex
+            input.createdAt = input.createdAt ?? Date()
+            input.generationProvider = GenerationProvider.fal.rawValue
+            input.backendEndpoint = plan.endpoint
+            let placeholder = createPlaceholder(
+                type: .image,
+                name: baseName,
+                duration: Defaults.imageDurationSeconds,
+                genInput: input,
+                folderId: resolvedFolderId,
+                destDir: destination,
+                fileExtension: "jpg",
+                editor: editor
+            )
+            placeholders.append(placeholder)
+        }
+        let primaryId = placeholders[0].id
+
+        Task { @MainActor in
+            var requestID: String?
+            do {
+                var requestInput = plan.input
+                if !plan.referenceFileURLs.isEmpty {
+                    let dataURLs = try await Self.falReferenceDataURLs(
+                        for: plan.referenceFileURLs
+                    )
+                    requestInput["image_urls"] = .array(dataURLs.map(FALJSONValue.string))
+                }
+                let submission = try await falQueueClient.submit(
+                    endpoint: plan.endpoint,
+                    input: requestInput
+                )
+                requestID = submission.requestId
+                for placeholder in placeholders {
+                    updateGenerationMetadata(placeholder, editor: editor, status: .generating) { input in
+                        input.backendJobId = submission.requestId
+                    }
+                }
+                editor.onProjectCheckpointRequired?()
+
+                let result = try await falQueueClient.waitForResult(submission)
+                let urls = try result.imageURLs()
+                await finalizeSuccess(
+                    urlStrings: urls,
+                    placeholders: placeholders,
+                    editor: editor,
+                    onComplete: onComplete,
+                    onFailure: onFailure
+                )
+            } catch is CancellationError {
+                for placeholder in placeholders {
+                    updateGenerationMetadata(
+                        placeholder,
+                        editor: editor,
+                        status: .failed("Generation cancelled")
+                    )
+                }
+                editor.onProjectCheckpointRequired?()
+                onFailure?()
+            } catch {
+                let message = Self.falFailureMessage(error, requestID: requestID)
+                Log.generation.error("fal.ai image generation failed model=\(plan.endpoint) error=\(message)")
+                for placeholder in placeholders {
+                    updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
+                }
+                editor.onProjectCheckpointRequired?()
+                onFailure?()
+            }
+        }
+
+        return primaryId
+    }
+
+    @discardableResult
+    func generateFALMedia(
+        plan: FALMediaGenerationPlan,
+        projectURL: URL?,
+        editor: EditorViewModel,
+        onComplete: (@MainActor (MediaAsset) -> Void)? = nil,
+        onFailure: (@MainActor () -> Void)? = nil
+    ) -> String {
+        var storedInput = plan.generationInput
+        storedInput.createdAt = storedInput.createdAt ?? Date()
+        storedInput.generationProvider = GenerationProvider.fal.rawValue
+        storedInput.backendEndpoint = plan.endpoint
+        let placeholder = createPlaceholder(
+            type: plan.outputType,
+            name: String(plan.generationInput.prompt.prefix(30)).isEmpty
+                ? plan.modelName : String(plan.generationInput.prompt.prefix(30)),
+            duration: plan.placeholderDuration,
+            genInput: storedInput,
+            folderId: plan.folderId.flatMap { editor.folder(id: $0) != nil ? $0 : nil },
+            destDir: Self.destinationDirectory(for: projectURL),
+            fileExtension: plan.fileExtension,
+            editor: editor
+        )
+
+        Task { @MainActor in
+            var requestID: String?
+            do {
+                let prepared = try await Self.prepareFALUploads(plan.uploads)
+                defer { Self.cleanupTempFiles(prepared.tempFiles) }
+                let uploaded = try await falStorageClient.upload(prepared.files)
+                var requestInput = plan.input
+                for (index, binding) in plan.uploads.enumerated() {
+                    guard uploaded.indices.contains(index) else {
+                        throw FALMediaGenerationError.missingSource
+                    }
+                    switch binding.target {
+                    case .scalar(let key):
+                        requestInput[key] = .string(uploaded[index])
+                    case .array(let key):
+                        var values = requestInput[key]?.arrayValue ?? []
+                        values.append(.string(uploaded[index]))
+                        requestInput[key] = .array(values)
+                    }
+                }
+
+                let submission = try await falQueueClient.submit(
+                    endpoint: plan.endpoint,
+                    input: requestInput
+                )
+                requestID = submission.requestId
+                updateGenerationMetadata(placeholder, editor: editor, status: .generating) { input in
+                    input.backendJobId = submission.requestId
+                }
+                editor.onProjectCheckpointRequired?()
+
+                let result = try await falQueueClient.waitForResult(submission)
+                await finalizeSuccess(
+                    urlStrings: try result.mediaURLs(),
+                    placeholders: [placeholder],
+                    editor: editor,
+                    onComplete: onComplete,
+                    onFailure: onFailure
+                )
+            } catch is CancellationError {
+                updateGenerationMetadata(
+                    placeholder,
+                    editor: editor,
+                    status: .failed("Generation cancelled")
+                )
+                editor.onProjectCheckpointRequired?()
+                onFailure?()
+            } catch {
+                let message = Self.falFailureMessage(error, requestID: requestID)
+                Log.generation.error(
+                    "fal.ai media generation failed model=\(plan.endpoint) error=\(message)"
+                )
+                updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
+                editor.onProjectCheckpointRequired?()
+                onFailure?()
+            }
+        }
+        return placeholder.id
+    }
+
+    private struct PreparedFALUploads: Sendable {
+        let files: [FALStorageFile]
+        let tempFiles: [URL]
+    }
+
+    @concurrent
+    private static func prepareFALUploads(
+        _ uploads: [FALMediaUpload]
+    ) async throws -> PreparedFALUploads {
+        var files: [FALStorageFile] = []
+        var tempFiles: [URL] = []
+        files.reserveCapacity(uploads.count)
+
+        do {
+            for upload in uploads {
+                try Task.checkCancellation()
+                var fileURL = upload.fileURL
+                if upload.type == .image, ImageConverter.requiresConversion(fileURL) {
+                    fileURL = try await ImageConverter.convertToJPEG(fileURL)
+                    tempFiles.append(fileURL)
+                }
+                if case .compressVideo720 = upload.preparation {
+                    if let compressed = try await VideoPreprocessor.transcodeIfNeeded(
+                        url: fileURL,
+                        maxResolution: .p720,
+                        requiredEncoding: nil
+                    ) {
+                        fileURL = compressed
+                        tempFiles.append(compressed)
+                    }
+                }
+                switch upload.preparation {
+                case .trimVideo(let trimmedSource):
+                    fileURL = try await VideoTrimExtractor.extract(trimmedSource)
+                    tempFiles.append(fileURL)
+                case .extractAudio(let trimmedSource):
+                    fileURL = try await AudioTrackExtractor.extract(
+                        sourceURL: upload.fileURL,
+                        trimmedSource: trimmedSource
+                    )
+                    tempFiles.append(fileURL)
+                case .none, .compressVideo720:
+                    break
+                }
+                files.append(FALStorageFile(
+                    url: fileURL,
+                    contentType: contentType(for: fileURL, fallback: upload.type)
+                ))
+            }
+            return PreparedFALUploads(files: files, tempFiles: tempFiles)
+        } catch {
+            cleanupTempFiles(tempFiles)
+            throw error
+        }
+    }
+
+    @concurrent
+    private static func falReferenceDataURLs(for sourceURLs: [URL]) async throws -> [String] {
+        var results: [String] = []
+        results.reserveCapacity(sourceURLs.count)
+
+        for sourceURL in sourceURLs {
+            try Task.checkCancellation()
+            let supportedDirectly = ["jpg", "jpeg", "png", "webp"]
+                .contains(sourceURL.pathExtension.lowercased())
+            let preparedURL = supportedDirectly
+                ? sourceURL
+                : try await ImageConverter.convertToJPEG(sourceURL)
+            defer {
+                if preparedURL != sourceURL {
+                    try? FileManager.default.removeItem(at: preparedURL)
+                }
+            }
+            do {
+                let data = try Data(contentsOf: preparedURL, options: .mappedIfSafe)
+                let contentType = contentType(for: preparedURL, fallback: .image)
+                results.append("data:\(contentType);base64,\(data.base64EncodedString())")
+            } catch {
+                throw FALImageGenerationError.unreadableReference(
+                    sourceURL.lastPathComponent
+                )
+            }
+        }
+        return results
+    }
+
     private func prepareReferences(
         references: [MediaAsset],
         trimmedSourceOverride: TrimmedSource?,
@@ -200,7 +490,7 @@ final class GenerationService {
         }
     }
 
-    private static func cleanupTempFiles(_ urls: [URL]) {
+    private nonisolated static func cleanupTempFiles(_ urls: [URL]) {
         for url in urls {
             try? FileManager.default.removeItem(at: url)
         }
@@ -258,9 +548,6 @@ final class GenerationService {
             asset.pendingDownloadURL = nil
             editor.importMediaAsset(asset, skipAppend: true)
             let finalized = await editor.finalizeImportedAsset(asset)
-            if finalized {
-                editor.appendGenerationLog(for: asset)
-            }
             return finalized
         } catch {
             let message = error.localizedDescription
@@ -289,7 +576,10 @@ final class GenerationService {
 
         let pending = editor.mediaAssets.filter(\.isRecoveringGeneration)
 
-        let byBackendJob = Dictionary(grouping: pending.compactMap { asset -> (String, MediaAsset)? in
+        let palmierPending = pending.filter {
+            $0.generationInput?.generationProvider != GenerationProvider.fal.rawValue
+        }
+        let byBackendJob = Dictionary(grouping: palmierPending.compactMap { asset -> (String, MediaAsset)? in
             guard let backendJobId = asset.generationInput?.backendJobId, !backendJobId.isEmpty else { return nil }
             return (backendJobId, asset)
         }, by: { $0.0 })
@@ -309,6 +599,84 @@ final class GenerationService {
                 self.resumedBackendJobIds.remove(backendJobId)
             }
         }
+
+        let falPending = pending.filter {
+            $0.generationInput?.generationProvider == GenerationProvider.fal.rawValue
+        }
+        let byFALRequest = Dictionary(grouping: falPending.compactMap { asset -> (String, MediaAsset)? in
+            guard let input = asset.generationInput,
+                  let endpoint = input.backendEndpoint,
+                  let requestId = input.backendJobId,
+                  !endpoint.isEmpty,
+                  !requestId.isEmpty else { return nil }
+            return ("fal:\(endpoint):\(requestId)", asset)
+        }, by: { $0.0 })
+
+        for (resumeKey, group) in byFALRequest where !resumedBackendJobIds.contains(resumeKey) {
+            let placeholders = sorted(group.map { $0.1 })
+            guard let input = placeholders.first?.generationInput,
+                  let endpoint = input.backendEndpoint,
+                  let requestId = input.backendJobId else { continue }
+            do {
+                let submission = try FALQueueRequestBuilder.submission(
+                    endpoint: endpoint,
+                    requestId: requestId
+                )
+                resumedBackendJobIds.insert(resumeKey)
+                Task { @MainActor [weak self, weak editor] in
+                    guard let self, let editor else { return }
+                    await self.monitorFALJob(
+                        submission: submission,
+                        placeholders: placeholders,
+                        editor: editor,
+                        onComplete: nil,
+                        onFailure: nil
+                    )
+                    self.resumedBackendJobIds.remove(resumeKey)
+                }
+            } catch {
+                let message = "Cannot resume fal.ai generation: \(error.localizedDescription)"
+                for placeholder in placeholders {
+                    updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
+                }
+                editor.onProjectCheckpointRequired?()
+            }
+        }
+    }
+
+    private func monitorFALJob(
+        submission: FALQueueSubmission,
+        placeholders: [MediaAsset],
+        editor: EditorViewModel,
+        onComplete: (@MainActor (MediaAsset) -> Void)?,
+        onFailure: (@MainActor () -> Void)?
+    ) async {
+        do {
+            let result = try await falQueueClient.waitForResult(submission)
+            await finalizeSuccess(
+                urlStrings: try result.mediaURLs(),
+                placeholders: placeholders,
+                editor: editor,
+                onComplete: onComplete,
+                onFailure: onFailure
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            let message = Self.falFailureMessage(error, requestID: submission.requestId)
+            Log.generation.error("fal.ai resume failed request=\(submission.requestId) error=\(message)")
+            for placeholder in placeholders {
+                updateGenerationMetadata(placeholder, editor: editor, status: .failed(message))
+            }
+            editor.onProjectCheckpointRequired?()
+            onFailure?()
+        }
+    }
+
+    private static func falFailureMessage(_ error: Error, requestID: String?) -> String {
+        let message = error.localizedDescription
+        guard let requestID, !requestID.isEmpty else { return message }
+        return "\(message)\nRequest ID: \(requestID)"
     }
 
     private func backendError(_ error: Error) -> (code: String?, message: String) {
@@ -394,7 +762,7 @@ final class GenerationService {
         asset.cachedRemoteURLExpiresAt = Date().addingTimeInterval(uploadCacheTTL)
     }
 
-    private static func contentType(for url: URL, fallback: ClipType) -> String {
+    private nonisolated static func contentType(for url: URL, fallback: ClipType) -> String {
         switch url.pathExtension.lowercased() {
         case "jpg", "jpeg": return "image/jpeg"
         case "png": return "image/png"

@@ -71,7 +71,12 @@ enum CostEstimator {
             guard let width = sourceWidth, let height = sourceHeight else {
                 return ceilCredits(model.creditsPerSecond)
             }
-            let targetEdge = selections["targetResolution"] == "1080p" ? 1920.0 : 3840.0
+            let targetEdge: Double = switch selections["targetResolution"] {
+            case "720p": 1280
+            case "1080p": 1920
+            case "1440p": 2560
+            default: 3840
+            }
             let factor = max(1, targetEdge / Double(max(width, height)))
             let outputMP = Double(width * height) * factor * factor / 1_000_000
             return tiers.first(where: { outputMP <= $0.upTo }).map { ceilCredits($0.credits) }

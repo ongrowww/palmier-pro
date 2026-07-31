@@ -38,7 +38,7 @@ extension GenerationView {
                             outer: AppTheme.Radius.sm,
                             padding: AppTheme.Spacing.xxs
                         ))
-                            .fill(selectedType == type ? Color.white.opacity(AppTheme.Opacity.faint) : .clear)
+                            .fill(selectedType == type ? AppTheme.Interaction.fill(AppTheme.Opacity.faint) : .clear)
                     )
                     .hoverHighlight(cornerRadius: AppTheme.Radius.concentric(
                         outer: AppTheme.Radius.sm,
@@ -53,7 +53,7 @@ extension GenerationView {
         .padding(AppTheme.Spacing.xxs)
         .background(
             RoundedRectangle(cornerRadius: AppTheme.Radius.sm)
-                .fill(Color.white.opacity(AppTheme.Opacity.subtle))
+                .fill(AppTheme.Interaction.fill(AppTheme.Opacity.subtle))
         )
         .overlay(
             RoundedRectangle(cornerRadius: AppTheme.Radius.sm)
@@ -63,27 +63,87 @@ extension GenerationView {
 
     // MARK: - Model picker
 
+    var providerPicker: some View {
+        Menu {
+            ForEach(GenerationProvider.allCases) { provider in
+                Button {
+                    selectedProvider = provider
+                } label: {
+                    Label {
+                        VStack(alignment: .leading) {
+                            Text(provider.displayName)
+                            Text(provider.detail)
+                        }
+                    } icon: {
+                        Image(systemName: provider.icon)
+                    }
+                }
+                .disabled(!provider.isAvailable)
+            }
+            Divider()
+            Button {
+                SettingsWindowController.shared.show(tab: .providers)
+            } label: {
+                Label("Manage provider keys…", systemImage: "key.horizontal")
+            }
+        } label: {
+            HStack(spacing: AppTheme.Spacing.xs) {
+                Image(systemName: selectedProvider.icon)
+                    .font(.system(size: AppTheme.FontSize.xxs))
+                    .foregroundStyle(selectedProvider == .fal
+                        ? AppTheme.Status.warningColor
+                        : AppTheme.Text.tertiaryColor)
+                Text(selectedProvider.toolbarDisplayName)
+                    .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
+                    .foregroundStyle(AppTheme.Text.secondaryColor)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: AppTheme.FontSize.micro, weight: .semibold))
+                    .foregroundStyle(AppTheme.Text.tertiaryColor)
+            }
+            .padding(.horizontal, AppTheme.Spacing.xs)
+            .padding(.vertical, AppTheme.Spacing.xxs)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .hoverHighlight()
+        .help(selectedProvider.detail)
+    }
+
     var modelPicker: some View {
         Menu {
             switch selectedType {
             case .video:
                 ForEach(enabledVideoModelsByProvider) { group in
-                    Section(group.name) {
+                    Section {
                         ForEach(group.models, id: \.index) { item in
-                            Button(item.model.displayName) { selectedVideoModelIndex = item.index }
+                            Button {
+                                selectedVideoModelIndex = item.index
+                            } label: {
+                                modelMenuLabel(item.model.entry)
+                            }
                         }
+                    } header: {
+                        modelFamilyHeader(group)
                     }
                 }
             case .image:
                 ForEach(enabledImageModels, id: \.index) { item in
-                    Button(item.model.displayName) { selectedImageModelIndex = item.index }
+                    Button {
+                        selectedImageModelIndex = item.index
+                    } label: {
+                        modelMenuLabel(item.model.entry)
+                    }
                 }
             case .audio:
                 ForEach(AudioModelConfig.Category.allCases, id: \.self) { category in
                     if let items = enabledAudioModelsByCategory[category], !items.isEmpty {
                         Section(category.label) {
                             ForEach(items, id: \.index) { item in
-                                Button(item.model.displayName) { selectedAudioModelIndex = item.index }
+                                Button {
+                                    selectedAudioModelIndex = item.index
+                                } label: {
+                                    modelMenuLabel(item.model.entry)
+                                }
                             }
                         }
                     }
@@ -93,20 +153,35 @@ extension GenerationView {
                     if let items = enabledUpscaleModelsByType[type], !items.isEmpty {
                         Section(type.trackLabel) {
                             ForEach(items, id: \.index) { item in
-                                Button(item.model.displayName) { selectedUpscaleModelIndex = item.index }
+                                Button {
+                                    selectedUpscaleModelIndex = item.index
+                                } label: {
+                                    modelMenuLabel(item.model.entry)
+                                }
                             }
                         }
                     }
                 }
             }
             Divider()
-            Button {
-                SettingsWindowController.shared.show(tab: .models)
-            } label: {
-                Label("Add models…", systemImage: "plus")
+            if selectedProvider == .palmierCloud {
+                Button {
+                    SettingsWindowController.shared.show(tab: .models)
+                } label: {
+                    Label("Add models…", systemImage: "plus")
+                }
+            } else {
+                Button {
+                    SettingsWindowController.shared.show(tab: .providers)
+                } label: {
+                    Label("Manage provider key…", systemImage: "key.horizontal")
+                }
             }
         } label: {
             HStack(spacing: AppTheme.Spacing.xs) {
+                if let iconKey = currentProviderIconKey {
+                    ProviderLogo(iconKey: iconKey, size: AppTheme.IconSize.xs)
+                }
                 Text(currentModelName)
                     .font(.system(size: AppTheme.FontSize.xs, weight: .medium))
                     .foregroundStyle(AppTheme.Text.secondaryColor)
@@ -122,6 +197,40 @@ extension GenerationView {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .hoverHighlight()
+    }
+
+    private var currentProviderIconKey: String? {
+        switch selectedType {
+        case .video: videoModel.entry.providerIconKey
+        case .image: imageModel.entry.providerIconKey
+        case .audio: audioModel.entry.providerIconKey
+        case .upscale: upscaleModel.entry.providerIconKey
+        }
+    }
+
+    @ViewBuilder
+    private func modelMenuLabel(_ entry: CatalogEntry) -> some View {
+        if let iconKey = entry.providerIconKey {
+            Label {
+                Text(entry.displayName)
+            } icon: {
+                ProviderLogo(iconKey: iconKey, size: AppTheme.IconSize.xs)
+            }
+        } else {
+            Text(entry.displayName)
+        }
+    }
+
+    @ViewBuilder
+    private func modelFamilyHeader(_ group: VideoModelProviderGroup) -> some View {
+        if let iconKey = group.providerIconKey {
+            HStack(spacing: AppTheme.Spacing.xs) {
+                ProviderLogo(iconKey: iconKey, size: AppTheme.IconSize.xs)
+                Text(group.name)
+            }
+        } else {
+            Text(group.name)
+        }
     }
 
     var voicePicker: some View {
@@ -376,7 +485,9 @@ extension GenerationView {
                                 .padding(.vertical, 4)
                                 .background(
                                     RoundedRectangle(cornerRadius: AppTheme.Radius.sm)
-                                        .fill(selection.wrappedValue == option ? Color.white.opacity(AppTheme.Opacity.soft) : Color.white.opacity(AppTheme.Opacity.subtle))
+                                        .fill(selection.wrappedValue == option
+                                            ? AppTheme.Interaction.fill(AppTheme.Opacity.soft)
+                                            : AppTheme.Interaction.fill(AppTheme.Opacity.subtle))
                                 )
                         }
                         .buttonStyle(.plain)

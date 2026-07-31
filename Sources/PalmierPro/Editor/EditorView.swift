@@ -3,13 +3,14 @@ import SwiftUI
 
 struct EditorView: NSViewControllerRepresentable {
     @Environment(EditorViewModel.self) var editor
+    @Bindable private var workspaceLayout = WorkspaceLayoutStore.shared
 
     func makeNSViewController(context: Context) -> EditorSplitViewController {
         EditorSplitViewController(editor: editor)
     }
 
     func updateNSViewController(_ controller: EditorSplitViewController, context: Context) {
-        controller.applyLayoutIfNeeded(editor.layoutPreset)
+        controller.applyLayoutIfNeeded(workspaceLayout.selection)
         controller.applyAgentVisibility(editor.agentPanelVisible)
         controller.applyMediaVisibility(editor.mediaPanelVisible)
         controller.applyInspectorVisibility(editor.inspectorPanelVisible)
@@ -57,7 +58,6 @@ final class EditorSplitViewController: PaddedDividerSplitViewController {
     private var currentPreset: LayoutPreset?
     private var currentMaximized: EditorViewModel.FocusedPanel?
     private var pendingPositioning: (() -> Void)?
-    private var isPositioning = false
     private weak var agentSplitItem: NSSplitViewItem?
     private weak var mediaSplitItem: NSSplitViewItem?
     private weak var previewSplitItem: NSSplitViewItem?
@@ -96,7 +96,7 @@ final class EditorSplitViewController: PaddedDividerSplitViewController {
         super.viewDidLoad()
         splitView.dividerStyle = .thin
         splitView.autosaveName = SplitAutosave.root
-        buildLayout(editor.layoutPreset)
+        buildLayout(WorkspaceLayoutStore.shared.selection)
     }
 
     // MARK: - Layout switching
@@ -386,7 +386,9 @@ final class EditorSplitViewController: PaddedDividerSplitViewController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        runPendingPositioning()
+        if pendingPositioning != nil {
+            DispatchQueue.main.async { [weak self] in self?.runPendingPositioning() }
+        }
         updateTourFrame()   // see EditorSplitViewController+Tour.swift
     }
 
@@ -397,20 +399,14 @@ final class EditorSplitViewController: PaddedDividerSplitViewController {
             self.mediaSplitItem?.isCollapsed = !self.editor.mediaPanelVisible
             self.inspectorSplitItem?.isCollapsed = !self.editor.inspectorPanelVisible
         }
-        if view.bounds.width > 0 {
-            view.layoutSubtreeIfNeeded()
-            runPendingPositioning()
-        } else {
-            view.needsLayout = true
-        }
+        view.needsLayout = true
     }
 
     private func runPendingPositioning() {
-        guard !isPositioning, view.bounds.width > 0, let work = pendingPositioning else { return }
+        guard view.bounds.width > 0, let work = pendingPositioning else { return }
         pendingPositioning = nil
-        isPositioning = true
         work()
-        isPositioning = false
+        updateTourFrame()
     }
 }
 
