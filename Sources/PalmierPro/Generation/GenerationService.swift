@@ -350,9 +350,10 @@ final class GenerationService {
                     tempFiles.append(fileURL)
                 }
                 if case .compressVideo720 = upload.preparation {
-                    if let compressed = try await VideoCompressor.compressIfNeeded(
+                    if let compressed = try await VideoPreprocessor.transcodeIfNeeded(
                         url: fileURL,
-                        maxResolution: .p720
+                        maxResolution: .p720,
+                        requiredEncoding: nil
                     ) {
                         fileURL = compressed
                         tempFiles.append(compressed)
