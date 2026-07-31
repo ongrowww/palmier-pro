@@ -92,5 +92,6 @@ Before accepting a sync pull request, manually verify one FAL generation, the
 `Check Problem` lookup for a stored request ID, and one Codex chat against a
 saved project. The workflow never merges a pull request by itself.
 
-The scheduled trigger only runs after this workflow exists on the fork's
-default branch. Until then, use the workflow's `Run workflow` action manually.
+Scheduled and manual runs become available after this workflow exists on the
+fork's default branch. Until then, compare and merge `upstream/main` from the
+integration branch directly.
