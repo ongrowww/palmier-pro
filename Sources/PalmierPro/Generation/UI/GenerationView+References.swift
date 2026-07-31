@@ -345,7 +345,7 @@ extension GenerationView {
                 onClear: { sourceVideo = nil },
                 onError: flashDropError
             )
-            if videoModel.supportsReferences {
+            if videoModel.maxReferenceImages > 0 {
                 FrameSlot(
                     label: "Reference Image",
                     asset: imageReferences.first,
@@ -354,6 +354,18 @@ extension GenerationView {
                     iconName: "photo.badge.plus",
                     onDrop: { imageReferences = [$0] },
                     onClear: { imageReferences.removeAll() },
+                    onError: flashDropError
+                )
+            }
+            if videoModel.maxReferenceAudios > 0 {
+                FrameSlot(
+                    label: "Replacement Audio",
+                    asset: refAudios.first,
+                    isTargeted: $refsTargeted,
+                    accepting: [.audio],
+                    iconName: "waveform",
+                    onDrop: { refAudios = [$0] },
+                    onClear: { refAudios.removeAll() },
                     onError: flashDropError
                 )
             }
