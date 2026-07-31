@@ -72,3 +72,25 @@ without contacting a paid model endpoint.
 Developers using Command Line Tools without the full Xcode Metal toolchain can
 set `PALMIER_SKIP_METAL_PLUGIN=1` for non-rendering local checks. A complete
 build still requires the full Xcode version supported by Palmier.
+
+## Thin-fork maintenance
+
+`ongrow/codex-provider` is the integration branch for the complete OnGROW
+overlay. Upstream changes are merged into this branch; the OnGROW commits are
+not replayed or copied manually for each Palmier release.
+
+`Upstream Watch` runs daily at 06:17 UTC and can also be started manually. It
+fetches `palmier-io/palmier-pro:main` and then follows one of two paths:
+
+- A conflict-free merge creates a draft `ongrow/upstream-*` pull request. CI
+  and the BYOK preview build must pass before it is merged.
+- A conflicting merge creates or updates an issue assigned to `Schrobo` with
+  the exact conflicting files. It never resolves or merges conflicts
+  automatically.
+
+Before accepting a sync pull request, manually verify one FAL generation, the
+`Check Problem` lookup for a stored request ID, and one Codex chat against a
+saved project. The workflow never merges a pull request by itself.
+
+The scheduled trigger only runs after this workflow exists on the fork's
+default branch. Until then, use the workflow's `Run workflow` action manually.
