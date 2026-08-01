@@ -221,13 +221,13 @@ extension GenerationView {
                     ? AppTheme.Opacity.strong : AppTheme.Opacity.opaque
             )
             .accessibilityLabel(
-                !falCredentials.hasKey ? "Add FAL API key"
-                    : connected ? "Generate with fal.ai" : "FAL integration preview"
+                !falCredentials.hasKey ? L10n.string("Add FAL API key")
+                    : connected ? L10n.string("Generate with fal.ai") : L10n.string("FAL integration preview")
             )
             .help(
-                !falCredentials.hasKey ? "Add a fal.ai API key in Settings."
-                    : connected ? "Review estimated fal.ai cost and generate."
-                    : "This fal.ai media type is not connected yet."
+                !falCredentials.hasKey ? L10n.string("Add a fal.ai API key in Settings.")
+                    : connected ? L10n.string("Review estimated fal.ai cost and generate.")
+                    : L10n.string("This fal.ai media type is not connected yet.")
             )
         } else {
             Button {
@@ -242,12 +242,16 @@ extension GenerationView {
             .buttonBorderShape(.circle)
             .controlSize(.regular)
             .tint(AppTheme.Accent.primary)
-            .accessibilityLabel(aiAllowed ? (selectedType == .upscale ? "Upscale" : "Generate") : "Sign in")
+            .accessibilityLabel(aiAllowed
+                ? (selectedType == .upscale ? L10n.string("Upscale") : L10n.string("Generate"))
+                : L10n.string("Sign in"))
             .disabled(aiAllowed ? !canSubmit : account.isMisconfigured || account.isSigningIn)
             .opacity((aiAllowed ? canSubmit : !account.isMisconfigured && !account.isSigningIn) ? AppTheme.Opacity.opaque : AppTheme.Opacity.strong)
             .help(aiAllowed
-                ? (selectedType == .upscale ? "Upscale source media" : "")
-                : (account.isMisconfigured ? "AI is unavailable" : account.isSigningIn ? "Opening Google" : "Sign in to generate"))
+                ? (selectedType == .upscale ? L10n.string("Upscale source media") : String())
+                : (account.isMisconfigured
+                    ? L10n.string("AI is unavailable")
+                    : account.isSigningIn ? L10n.string("Opening Google") : L10n.string("Sign in to generate")))
         }
     }
 
