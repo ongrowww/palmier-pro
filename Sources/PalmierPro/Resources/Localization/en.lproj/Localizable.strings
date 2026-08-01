@@ -35,6 +35,7 @@
 "%lld selected" = "%lld selected";
 "%lld text clips are ready in Palmier Pro." = "%lld text clips are ready in Palmier Pro.";
 "%lld videos are ready in Palmier Pro." = "%lld videos are ready in Palmier Pro.";
+"%lld/%lld" = "%lld/%lld";
 "%lldk credits" = "%lldk credits";
 "(image payload)" = "(image payload)";
 "/ month" = "/ month";
@@ -59,12 +60,15 @@
 "AI Generated" = "AI Generated";
 "AI agent" = "AI agent";
 "AI is unavailable" = "AI is unavailable";
+"API key stored" = "API key stored";
 "About Palmier Pro" = "About Palmier Pro";
 "Account" = "Account";
 "Account settings" = "Account settings";
 "Activity unavailable" = "Activity unavailable";
+"Add FAL API key" = "Add FAL API key";
 "Add Range to Chat" = "Add Range to Chat";
 "Add Text" = "Add Text";
+"Add a fal.ai API key in Settings." = "Add a fal.ai API key in Settings.";
 "Add an email above to enable a reply" = "Add an email above to enable a reply";
 "Add captions to my timeline" = "Add captions to my timeline";
 "Add credits" = "Add credits";
@@ -93,6 +97,10 @@
 "All" = "All";
 "All fonts" = "All fonts";
 "All timelines" = "All timelines";
+"Allow for session" = "Allow for session";
+"Allow matching requests for this Codex session" = "Allow matching requests for this Codex session";
+"Allow once" = "Allow once";
+"Allow only this Codex request" = "Allow only this Codex request";
 "Amount" = "Amount";
 "Analyzing media so you can search it." = "Analyzing media so you can search it.";
 "Angle" = "Angle";
@@ -157,12 +165,23 @@
 "Changing the ratio preserves the shorter edge." = "Changing the ratio preserves the shorter edge.";
 "Chat history" = "Chat history";
 "Chat with your agent! It can generate content, edit clips, organize your assets, and much more. Start by signing in, or bring your own Anthropic API key." = "Chat with your agent! It can generate content, edit clips, organize your assets, and much more. Start by signing in, or bring your own Anthropic API key.";
+"Check Problem" = "Check Problem";
 "Check for Updates…" = "Check for Updates…";
+"Checked with FAL" = "Checked with FAL";
+"Checking the existing request with FAL…" = "Checking the existing request with FAL…";
+"Checking…" = "Checking…";
 "Choose Audio" = "Choose Audio";
+"Choose Codex" = "Choose Codex";
+"Choose Codex model" = "Choose Codex model";
+"Choose Codex reasoning effort" = "Choose Codex reasoning effort";
+"Choose Codex speed" = "Choose Codex speed";
+"Choose Palmier model" = "Choose Palmier model";
 "Choose a .cube LUT file" = "Choose a .cube LUT file";
+"Choose a Codex executable" = "Choose a Codex executable";
 "Choose a crop aspect" = "Choose a crop aspect";
 "Choose animation clip color" = "Choose animation clip color";
 "Choose audio clip color" = "Choose audio clip color";
+"Choose chat provider" = "Choose chat provider";
 "Choose color" = "Choose color";
 "Choose image clip color" = "Choose image clip color";
 "Choose sequence clip color" = "Choose sequence clip color";
@@ -182,6 +201,7 @@
 "Clear cache" = "Clear cache";
 "Clear index" = "Clear index";
 "Clear search" = "Clear search";
+"Clear the Codex executable override" = "Clear the Codex executable override";
 "Clearing…" = "Clearing…";
 "Click Generate to open the generation panel." = "Click Generate to open the generation panel.";
 "Click to install update" = "Click to install update";
@@ -195,7 +215,10 @@
 "Cloud" = "Cloud";
 "Cloud auto-detects languages, produces more accurate transcripts, can identify speakers, and uses 25 credits/hr when a transcript is not cached." = "Cloud auto-detects languages, produces more accurate transcripts, can identify speakers, and uses 25 credits/hr when a transcript is not cached.";
 "Codec" = "Codec";
+"Codex CLI" = "Codex CLI";
+"Codex approval request" = "Codex approval request";
 "Collapse" = "Collapse";
+"Collapse approval details" = "Collapse approval details";
 "Color" = "Color";
 "Color Burn" = "Color Burn";
 "Color Dodge" = "Color Dodge";
@@ -212,6 +235,7 @@
 "Contrast" = "Contrast";
 "Copied" = "Copied";
 "Copy" = "Copy";
+"Copy Details" = "Copy Details";
 "Copy Path" = "Copy Path";
 "Copy message" = "Copy message";
 "Copy prompt" = "Copy prompt";
@@ -264,6 +288,8 @@
 "Delete “%@”?" = "Delete “%@”?";
 "Denoise" = "Denoise";
 "Denoise failed. Playback uses the original audio — adjust Strength to retry." = "Denoise failed. Playback uses the original audio — adjust Strength to retry.";
+"Deny" = "Deny";
+"Deny this Codex request" = "Deny this Codex request";
 "Describe the audio scene" = "Describe the audio scene";
 "Describe the audio scene (minimum %lld characters)" = "Describe the audio scene (minimum %lld characters)";
 "Describe the image" = "Describe the image";
@@ -326,10 +352,12 @@
 "Enable: %@" = "Enable: %@";
 "Enhance" = "Enhance";
 "Enhance resolution or frame rate with AI" = "Enhance resolution or frame rate with AI";
+"Enter FAL API key" = "Enter FAL API key";
 "Enter Full Screen" = "Enter Full Screen";
 "Estimated cost. Actual billing may differ slightly." = "Estimated cost. Actual billing may differ slightly.";
 "Exclusion" = "Exclusion";
 "Expand" = "Expand";
+"Expand approval details" = "Expand approval details";
 "Export" = "Export";
 "Export (⌘E)" = "Export (⌘E)";
 "Export Queue" = "Export Queue";
@@ -340,6 +368,7 @@
 "Export…" = "Export…";
 "Exposure" = "Exposure";
 "Extra Large" = "Extra Large";
+"FAL integration preview" = "FAL integration preview";
 "Fade In" = "Fade In";
 "Fade Out" = "Fade Out";
 "Failed" = "Failed";
@@ -391,6 +420,9 @@
 "Generate music for the timeline" = "Generate music for the timeline";
 "Generate music that fits the video" = "Generate music that fits the video";
 "Generate video, image, or audio with different models and settings. Drag assets from the media panel above into the reference frame." = "Generate video, image, or audio with different models and settings. Drag assets from the media panel above into the reference frame.";
+"Generate with fal.ai" = "Generate with fal.ai";
+"Generate with fal.ai?" = "Generate with fal.ai?";
+"Generate · %@" = "Generate · %@";
 "Generate · %lld credits" = "Generate · %lld credits";
 "Generate · 1 credit" = "Generate · 1 credit";
 "Generated" = "Generated";
@@ -505,6 +537,8 @@
 "MCP Setup" = "MCP Setup";
 "Main + Sidebar" = "Main + Sidebar";
 "Manage credits" = "Manage credits";
+"Manage provider keys…" = "Manage provider keys…";
+"Manage provider key…" = "Manage provider key…";
 "Manage subscription" = "Manage subscription";
 "Manual setup" = "Manual setup";
 "Mark Beats" = "Mark Beats";
@@ -562,6 +596,7 @@
 "New version available" = "New version available";
 "Newer timeline format with better support for DaVinci Resolve and Final Cut Pro. Supports basic edits, keyframes, and text, but not color, effects, edge softness, or edge rounding." = "Newer timeline format with better support for DaVinci Resolve and Final Cut Pro. Supports basic edits, keyframes, and text, but not color, effects, edge softness, or edge rounding.";
 "Next" = "Next";
+"No API key stored" = "No API key stored";
 "No Community Skills" = "No Community Skills";
 "No Installed Skills" = "No Installed Skills";
 "No Matching Skills" = "No Matching Skills";
@@ -602,10 +637,13 @@
 "Opacity" = "Opacity";
 "Open" = "Open";
 "Open %@" = "Open %@";
+"Open Codex settings" = "Open Codex settings";
 "Open Project" = "Open Project";
 "Open Settings" = "Open Settings";
 "Open Skills Folder" = "Open Skills Folder";
 "Open Skills to browse community playbooks, create your own, or add them to other agents." = "Open Skills to browse community playbooks, create your own, or add them to other agents.";
+"Open Terminal" = "Open Terminal";
+"Open Terminal with Codex login instructions" = "Open Terminal with Codex login instructions";
 "Open Timeline" = "Open Timeline";
 "Opening Google" = "Opening Google";
 "Opening Google…" = "Opening Google…";
@@ -624,6 +662,7 @@
 "Palmier couldn't load this clip's source file. It may be missing, on an ejected drive, or unreadable." = "Palmier couldn't load this clip's source file. It may be missing, on an ejected drive, or unreadable.";
 "Palmier couldn't load this source file. It may be missing, on an ejected drive, or unreadable." = "Palmier couldn't load this source file. It may be missing, on an ejected drive, or unreadable.";
 "Palmier loaded this clip's source file but couldn't prepare it for playback. The file may be corrupt or in an unsupported format." = "Palmier loaded this clip's source file but couldn't prepare it for playback. The file may be corrupt or in an unsupported format.";
+"Palmier uses your installed Codex CLI and its existing sign-in. Credentials stay with Codex." = "Palmier uses your installed Codex CLI and its existing sign-in. Credentials stay with Codex.";
 "Paste" = "Paste";
 "Path" = "Path";
 "Per line" = "Per line";
@@ -715,6 +754,7 @@
 "Retry" = "Retry";
 "Retry Download" = "Retry Download";
 "Reveal in Finder" = "Reveal in Finder";
+"Review estimated fal.ai cost and generate." = "Review estimated fal.ai cost and generate.";
 "Ripple Delete" = "Ripple Delete";
 "Ripple Delete Gap" = "Ripple Delete Gap";
 "Ripple Insert" = "Ripple Insert";
@@ -821,6 +861,7 @@
 "Split at Playhead" = "Split at Playhead";
 "Split at Playhead (⌘K)" = "Split at Playhead (⌘K)";
 "Spoken" = "Spoken";
+"Start a new chat to change provider" = "Start a new chat to change provider";
 "Start creating" = "Start creating";
 "Start creating, or explore these to get the most out of Palmier Pro." = "Start creating, or explore these to get the most out of Palmier Pro.";
 "Starts %@s into the group's clock; matched the master with %@%% confidence." = "Starts %@s into the group's clock; matched the master with %@%% confidence.";
@@ -831,6 +872,7 @@
 "Stop editing crop on canvas" = "Stop editing crop on canvas";
 "Stopped" = "Stopped";
 "Storage" = "Storage";
+"Stored in macOS Keychain" = "Stored in macOS Keychain";
 "Streaming through your Anthropic API key (BYOK)" = "Streaming through your Anthropic API key (BYOK)";
 "Strikethrough" = "Strikethrough";
 "Style" = "Style";
@@ -851,6 +893,7 @@
 "System appearance" = "System appearance";
 "Take a screenshot of the preview and use it as a reference for generation. Particularly useful for creating AI transitions." = "Take a screenshot of the preview and use it as a reference for generation. Particularly useful for creating AI transitions.";
 "Target Language" = "Target Language";
+"Technical Details" = "Technical Details";
 "Temperature" = "Temperature";
 "Temporary files" = "Temporary files";
 "Text" = "Text";
@@ -864,6 +907,7 @@
 "The selected projects will be moved to the Trash." = "The selected projects will be moved to the Trash.";
 "The timeline settings changed. Close this sheet and try again." = "The timeline settings changed. Close this sheet and try again.";
 "Theme" = "Theme";
+"This fal.ai media type is not connected yet." = "This fal.ai media type is not connected yet.";
 "This is the timeline ruler. Shift+drag on the ruler to select a range to render. You can pick any slot to AI edit or generate music that fits that range." = "This is the timeline ruler. Shift+drag on the ruler to select a range to render. You can pick any slot to AI edit or generate music that fits that range.";
 "This is where all your footage and assets live." = "This is where all your footage and assets live.";
 "This is your inspector panel. Select a clip from the timeline to edit it." = "This is your inspector panel. Select a clip from the timeline to edit it.";
@@ -904,6 +948,7 @@
 "Type" = "Type";
 "Typewriter" = "Typewriter";
 "UPPERCASE" = "UPPERCASE";
+"Unable to check FAL: %@" = "Unable to check FAL: %@";
 "Unable to open Claude Desktop" = "Unable to open Claude Desktop";
 "Unable to save skill" = "Unable to save skill";
 "Underline" = "Underline";
@@ -927,12 +972,16 @@
 "Upscale source media" = "Upscale source media";
 "Upscale…" = "Upscale…";
 "Upscale… (Paid)" = "Upscale… (Paid)";
+"Use Automatic" = "Use Automatic";
 "Use an aspect ratio with two positive numbers, such as 3:2." = "Use an aspect ratio with two positive numbers, such as 3:2.";
 "Use as first frame or reference" = "Use as first frame or reference";
 "Use for non-English or mixed-language audio." = "Use for non-English or mixed-language audio.";
 "Use trimmed portion only" = "Use trimmed portion only";
 "Use your own API key for AI chat. Stored in the macOS Keychain." = "Use your own API key for AI chat. Stored in the macOS Keychain.";
+"Use your own fal.ai account for generation. The key is stored only in the macOS Keychain." = "Use your own fal.ai account for generation. The key is stored only in the macOS Keychain.";
 "Uses selected clips when available, otherwise all captionable audio. Choose a track to limit captions." = "Uses selected clips when available, otherwise all captionable audio. Choose a track to limit captions.";
+"Uses the existing request ID. No prompt or media is uploaded." = "Uses the existing request ID. No prompt or media is uploaded.";
+"Uses the stored error details. Nothing is sent." = "Uses the stored error details. Nothing is sent.";
 "Uses the whole timeline by default. Mark a range on the timeline to score only that span." = "Uses the whole timeline by default. Mark a range on the timeline to score only that span.";
 "Version" = "Version";
 "Version %@" = "Version %@";
@@ -961,6 +1010,7 @@
 "We read every message. We won't email you, as requested." = "We read every message. We won't email you, as requested.";
 "Welcome to Palmier Pro" = "Welcome to Palmier Pro";
 "Welcome to Palmier Pro, %@" = "Welcome to Palmier Pro, %@";
+"What to do" = "What to do";
 "What's New in v%@" = "What's New in v%@";
 "White Balance" = "White Balance";
 "Whites" = "Whites";
@@ -989,6 +1039,7 @@
 "drift correction skipped — it would overwrite an adjacent clip" = "drift correction skipped — it would overwrite an adjacent clip";
 "drift-corrected" = "drift-corrected";
 "error" = "error";
+"fal.ai API Key" = "fal.ai API Key";
 "group moved right to fit" = "group moved right to fit";
 "lowercase" = "lowercase";
 "or use your own Anthropic key" = "or use your own Anthropic key";
