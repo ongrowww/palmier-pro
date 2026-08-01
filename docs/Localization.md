@@ -16,7 +16,7 @@ After adding or removing UI copy, run:
 scripts/localization/sync.sh
 ```
 
-This extracts compiler-known Swift strings, adds registered model keys, regenerates `en.lproj/Localizable.strings`, and checks localization integrity. CI rejects a stale English inventory, raw literals in known UI state assignments, malformed catalogs, and incompatible format placeholders. Missing or obsolete target-language entries produce warnings so feature and release PRs can use the English fallback; PRs that change a non-English catalog require complete coverage.
+This extracts compiler-known Swift strings, adds registered model keys, regenerates `en.lproj/Localizable.strings`, and checks localization integrity. CI rejects a stale English inventory, raw literals in known UI state assignments, malformed catalogs, and incompatible format placeholders. Missing or obsolete target-language entries produce warnings so feature and release PRs can use the English fallback; PRs that change a non-English catalog require complete coverage. Thin-fork upstream sync branches and the integration branch retain warning-only coverage because OnGROW-only UI copy intentionally falls back to English until it is translated.
 
 ## Adding a language
 

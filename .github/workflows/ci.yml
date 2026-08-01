@@ -35,6 +35,8 @@ jobs:
         run: |
           localization_args=()
           if [[ "${{ github.event_name }}" == "pull_request" ]] &&
+             [[ ! "${{ github.head_ref }}" =~ ^ongrow/upstream- ]] &&
+             [[ "${{ github.head_ref }}" != "ongrow/codex-provider" ]] &&
              ! git diff --quiet HEAD^1 HEAD -- \
                ':(glob)Sources/PalmierPro/Resources/Localization/*.lproj/*.strings' \
                ':(exclude,glob)Sources/PalmierPro/Resources/Localization/en.lproj/*.strings'; then

@@ -221,13 +221,13 @@ extension GenerationView {
                     ? AppTheme.Opacity.strong : AppTheme.Opacity.opaque
             )
             .accessibilityLabel(
-                !falCredentials.hasKey ? L10n.string("Add FAL API key")
-                    : connected ? L10n.string("Generate with fal.ai") : L10n.string("FAL integration preview")
+                !falCredentials.hasKey ? "Add FAL API key"
+                    : connected ? "Generate with fal.ai" : "FAL integration preview"
             )
             .help(
-                !falCredentials.hasKey ? L10n.string("Add a fal.ai API key in Settings.")
-                    : connected ? L10n.string("Review estimated fal.ai cost and generate.")
-                    : L10n.string("This fal.ai media type is not connected yet.")
+                !falCredentials.hasKey ? "Add a fal.ai API key in Settings."
+                    : connected ? "Review estimated fal.ai cost and generate."
+                    : "This fal.ai media type is not connected yet."
             )
         } else {
             Button {
