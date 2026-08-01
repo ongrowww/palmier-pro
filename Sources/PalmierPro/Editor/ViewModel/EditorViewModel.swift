@@ -92,6 +92,7 @@ final class EditorViewModel {
     // MARK: - Tutorial tour
 
     let tour = TourController()
+    var inspectorClipTabRequest: InspectorView.ClipTab?
 
     // MARK: - Transient UI state
 
@@ -284,6 +285,9 @@ final class EditorViewModel {
         mediaVisualCache.speech.onAnalyzingCountChange = { [weak self] count in
             self?.speechAnalyzingCount = count
         }
+        undo.onActionCommitted = { [weak self] in
+            self?.captureCommittedEdit()
+        }
 
         // Re-check media presence when the app regains focus: a user may have
         // deleted/moved backing files in Finder (or ejected a volume) while we
@@ -293,6 +297,12 @@ final class EditorViewModel {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshMissingMediaCache() }
         }
+    }
+
+    private func captureCommittedEdit() {
+        var payload = Analytics.originProperties()
+        payload["project_id"] = projectId ?? "unknown"
+        Analytics.capture(.editorEditCommitted, properties: payload)
     }
 
     @ObservationIgnored private nonisolated(unsafe) var didBecomeActiveObserver: NSObjectProtocol?
