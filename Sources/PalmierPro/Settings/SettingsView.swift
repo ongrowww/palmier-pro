@@ -14,14 +14,14 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .account: return "Account"
-        case .general: return "General"
-        case .appearance: return "Appearance"
-        case .models: return "Models"
-        case .providers: return "Providers"
-        case .agent: return "Agent"
-        case .skills: return "Skills"
-        case .storage: return "Storage"
+        case .account: return L10n.key("Account")
+        case .general: return L10n.key("General")
+        case .appearance: return L10n.key("Appearance")
+        case .models: return L10n.key("Models")
+        case .providers: return L10n.key("Providers")
+        case .agent: return L10n.key("Agent")
+        case .skills: return L10n.key("Skills")
+        case .storage: return L10n.key("Storage")
         }
     }
 
@@ -98,7 +98,7 @@ private struct SettingsSidebar: View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.xxs) {
             ForEach(visibleTabs) { tab in
                 SidebarRowButton(
-                    label: tab.label,
+                    label: L10n.string(key: tab.label),
                     systemImage: tab.systemImage,
                     isSelected: selectedTab == tab,
                     action: { selectedTab = tab }
@@ -115,7 +115,7 @@ private struct SettingsDetail: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(tab.label)
+            Text(L10n.string(key: tab.label))
                 .font(.system(size: AppTheme.FontSize.title1, weight: AppTheme.FontWeight.regular))
                 .foregroundStyle(AppTheme.Text.primaryColor)
                 .frame(
@@ -137,12 +137,7 @@ private struct SettingsDetail: View {
                             case .account:
                                 AccountPane()
                             case .general:
-                                SettingsSection(title: "Notifications") {
-                                    NotificationsPane()
-                                }
-                                SettingsSection(title: "Privacy & Diagnostics") {
-                                    PrivacyPane()
-                                }
+                                GeneralPane()
                             case .appearance:
                                 AppearancePane()
                             case .models:
@@ -177,7 +172,7 @@ struct SettingsSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.smMd) {
-            Text(title)
+            Text(verbatim: title)
                 .font(.system(size: AppTheme.FontSize.smMd, weight: AppTheme.FontWeight.regular))
                 .foregroundStyle(AppTheme.Text.primaryColor)
 
@@ -198,7 +193,7 @@ struct SettingsGroup<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.smMd) {
-            Text(title)
+            Text(verbatim: title)
                 .font(.system(size: AppTheme.FontSize.smMd, weight: AppTheme.FontWeight.regular))
                 .foregroundStyle(AppTheme.Text.primaryColor)
             content()
@@ -214,10 +209,10 @@ struct SettingsToggleRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: AppTheme.Spacing.md) {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
-                Text(title)
+                Text(verbatim: title)
                     .font(.system(size: AppTheme.FontSize.md, weight: AppTheme.FontWeight.regular))
                     .foregroundStyle(AppTheme.Text.primaryColor)
-                Text(subtitle)
+                Text(verbatim: subtitle)
                     .font(.system(size: AppTheme.FontSize.sm))
                     .foregroundStyle(AppTheme.Text.tertiaryColor)
                     .fixedSize(horizontal: false, vertical: true)
@@ -225,7 +220,7 @@ struct SettingsToggleRow: View {
 
             Spacer(minLength: AppTheme.Spacing.lg)
 
-            Toggle("", isOn: $isOn)
+            Toggle(String(), isOn: $isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.mini)
@@ -244,12 +239,12 @@ final class SettingsWindowController: NSWindowController {
 
     private init() {
         let initialView = SettingsView().tint(AppTheme.Accent.primary)
-        let hosting = NSHostingController(rootView: AnyView(initialView))
+        let hosting = NSHostingController(rootView: AnyView(initialView.appLocalization()))
         hosting.sizingOptions = .minSize
         let window = NSWindow(contentViewController: hosting)
         window.setContentSize(AppTheme.Window.settingsDefault)
         window.minSize = AppTheme.Window.settingsMin
-        window.title = "Settings"
+        window.title = L10n.string("Settings")
         window.backgroundColor = AppTheme.Background.base.withAlphaComponent(0.4)
         window.isOpaque = false
         window.titleVisibility = .hidden
@@ -269,6 +264,7 @@ final class SettingsWindowController: NSWindowController {
             hosting?.rootView = AnyView(
                 SettingsView(initialTab: tab)
                     .id(UUID())
+                    .appLocalization()
                     .tint(AppTheme.Accent.primary)
             )
         }

@@ -161,15 +161,15 @@ extension GenerationView {
             return "\(label) estimated.\(referenceNote) Your fal.ai account is billed directly; pricing may change."
         }
         guard let cost = estimatedCost else {
-            return "Estimated cost. Actual billing may differ slightly."
+            return L10n.string("Estimated cost. Actual billing may differ slightly.")
         }
         guard let left = remainingCredits else {
-            return "\(cost) credits estimated. Actual billing may differ."
+            return CostEstimator.localizedEstimate(cost)
         }
         if cost > left {
-            return "\(cost) credits needed. Only \(left.formatted()) remaining."
+            return CostEstimator.localizedInsufficientCredits(cost, remaining: left)
         }
-        return "\(cost) credits. \((left - cost).formatted()) credits remaining after this generation."
+        return CostEstimator.localizedRemainingCredits(cost, remaining: left - cost)
     }
 
     var costEstimateLabel: some View {
@@ -558,24 +558,24 @@ extension GenerationView {
         case .audio:
             let inputAssets = audioInputAssets(for: audioModel)
             if audioUsesSource {
-                guard audioSource != nil else { return "Add source media." }
+                guard audioSource != nil else { return L10n.string("Add source media.") }
                 return audioModel.validate(spanSeconds: effectiveAudioSourceSpanSeconds)
                     ?? audioModel.validate(params: audioParams(audioDuration: audioDuration))
             }
             return audioModel.validate(params: audioParams(audioDuration: audioDuration))
                 ?? inputAssets.validate(for: audioModel)
         case .upscale:
-            guard let source = upscaleSource else { return "Add source media." }
+            guard let source = upscaleSource else { return L10n.string("Add source media.") }
             guard upscaleModel.supportedTypes.contains(source.type) else {
-                return "\(upscaleModel.displayName) does not support this media type."
+                return L10n.string("\(upscaleModel.displayName) does not support this media type.")
             }
             guard source.sourceWidth != nil, source.sourceHeight != nil else {
-                return "Loading source dimensions…"
+                return L10n.string("Loading source dimensions…")
             }
             if source.type == .video {
-                guard source.sourceFPS != nil else { return "Loading source frame rate…" }
+                guard source.sourceFPS != nil else { return L10n.string("Loading source frame rate…") }
                 guard upscaleModel.supports(source: source) else {
-                    return "This model cannot cap the output at 60 FPS."
+                    return L10n.string("This model cannot cap the output at 60 FPS.")
                 }
             }
             return nil
