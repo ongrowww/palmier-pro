@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Cache SwiftPM
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .build
           key: byok-preview-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
@@ -30,7 +30,7 @@ jobs:
         run: scripts/package-byok-preview.sh
 
       - name: Upload preview DMG
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: PalmierPro-BYOK-Preview-${{ github.sha }}
           path: .build/PalmierPro-BYOK-Preview.dmg
