@@ -48,6 +48,7 @@ final class ToolExecutor {
     func bindProject(_ project: VideoProject?) {
         guard frontmostProjectProvider != nil else { return }
         boundProject = project
+        lastTranscriptSession = nil
     }
 
     func setMCPClientInfo(_ clientInfo: MCPClientInfo) {
@@ -55,7 +56,7 @@ final class ToolExecutor {
     }
 
     var feedbackState = FeedbackState()
-    var lastTranscriptContext: TranscriptionToolContext?
+    var lastTranscriptSession: TranscriptSession?
 
     func execute(
         name: String,
@@ -69,11 +70,16 @@ final class ToolExecutor {
         }
     }
 
+    static func droppingAutofilledBlanks(from args: [String: Any]) -> [String: Any] {
+        args.filter { !($0.value is NSNull) && ($0.value as? String) != "" }
+    }
+
     private func executeWithOrigin(
         name: String,
         args: [String: Any],
         origin: Analytics.Origin
     ) async -> ToolResult {
+        let args = Self.droppingAutofilledBlanks(from: args)
         let started = ContinuousClock.now
         guard let tool = ToolName(rawValue: name) else {
             let result = ToolResult.error("Unknown tool: \(name)")
@@ -289,6 +295,7 @@ final class ToolExecutor {
         case .addClips:         return try addClips(editor, args)
         case .insertClips:      return try insertClips(editor, args)
         case .removeClips:      return try removeClips(editor, args)
+        case .manageClipLinks:  return try manageClipLinks(editor, args)
         case .manageTracks:     return try manageTracks(editor, args)
         case .moveClips:        return try moveClips(editor, args)
         case .applyLayout:      return try applyLayout(editor, args)
@@ -474,6 +481,15 @@ func isJSONBoolean(_ value: Any) -> Bool {
 
 // Untrusted Double→Int: nil on NaN/Inf/overflow instead of trapping.
 func safeInt(_ d: Double) -> Int? { Int(exactly: d.rounded(.towardZero)) }
+
+/// Strict JSON integer parsing for identifiers and indexes. Unlike `Dictionary.int`,
+/// this rejects fractional numbers and numeric strings.
+func exactJSONInt(_ raw: Any?) -> Int? {
+    guard let raw, !isJSONBoolean(raw) else { return nil }
+    if let value = raw as? Int { return value }
+    guard let value = (raw as? NSNumber)?.doubleValue else { return nil }
+    return Int(exactly: value)
+}
 
 // Clamp before converting so the Int(...) can't overflow.
 func clampInt(_ d: Double, min lo: Int, max hi: Int) -> Int {
