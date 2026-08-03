@@ -60,9 +60,9 @@
 "AI Generated" = "AI Generated";
 "AI agent" = "AI agent";
 "AI is unavailable" = "AI is unavailable";
-"API key stored" = "API key stored";
 "AI transcription" = "AI transcription";
 "AI videos" = "AI videos";
+"API key stored" = "API key stored";
 "About Palmier Pro" = "About Palmier Pro";
 "Account" = "Account";
 "Account settings" = "Account settings";
@@ -94,8 +94,8 @@
 "Added to %@" = "Added to %@";
 "Adjust" = "Adjust";
 "Adjust Range" = "Adjust Range";
-"Agent" = "Agent";
 "Ads and branded content" = "Ads and branded content";
+"Agent" = "Agent";
 "Agent Mode" = "Agent Mode";
 "Agent Panel" = "Agent Panel";
 "Agentic editing" = "Agentic editing";
@@ -182,7 +182,6 @@
 "Choose Codex model" = "Choose Codex model";
 "Choose Codex reasoning effort" = "Choose Codex reasoning effort";
 "Choose Codex speed" = "Choose Codex speed";
-"Choose Palmier model" = "Choose Palmier model";
 "Choose a .cube LUT file" = "Choose a .cube LUT file";
 "Choose a Codex executable" = "Choose a Codex executable";
 "Choose a crop aspect" = "Choose a crop aspect";
@@ -947,7 +946,6 @@
 "The timeline settings changed. Close this sheet and try again." = "The timeline settings changed. Close this sheet and try again.";
 "Theme" = "Theme";
 "This fal.ai media type is not connected yet." = "This fal.ai media type is not connected yet.";
-"This is the timeline ruler. Shift+drag on the ruler to select a range to render. You can pick any slot to AI edit or generate music that fits that range." = "This is the timeline ruler. Shift+drag on the ruler to select a range to render. You can pick any slot to AI edit or generate music that fits that range.";
 "This is where all your footage and assets live." = "This is where all your footage and assets live.";
 "This is your preview panel to play a selected media or the whole timeline." = "This is your preview panel to play a selected media or the whole timeline.";
 "This model cannot cap the output at 60 FPS." = "This model cannot cap the output at 60 FPS.";
@@ -1051,11 +1049,11 @@
 "Welcome" = "Welcome";
 "Welcome to Palmier Pro" = "Welcome to Palmier Pro";
 "Welcome to Palmier Pro, %@" = "Welcome to Palmier Pro, %@";
-"What to do" = "What to do";
 "Welcome, %@" = "Welcome, %@";
 "What best describes your role?" = "What best describes your role?";
 "What do you make?" = "What do you make?";
 "What interests you most about Palmier Pro?" = "What interests you most about Palmier Pro?";
+"What to do" = "What to do";
 "What's New in v%@" = "What's New in v%@";
 "White Balance" = "White Balance";
 "Whites" = "Whites";
