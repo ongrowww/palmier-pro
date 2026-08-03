@@ -137,6 +137,7 @@ struct CodexProviderTests {
         #expect(threadCall.params["approvalPolicy"] == .string("on-request"))
         let tools = try #require(threadCall.params["dynamicTools"]?.arrayValue)
         #expect(tools.contains { $0["name"] == .string("get_timeline") })
+        #expect(tools.contains { $0["name"] == .string("manage_clip_links") })
         #expect(tools.contains { $0["name"] == .string("read_skill") })
 
         let turnCall = try #require(await fake.call("turn/start"))
@@ -167,19 +168,33 @@ struct CodexProviderTests {
 
         let collection = Task { @MainActor in
             var text = ""
+            var reasoning = ""
+            var reasoningCompleted = false
             var startedTool: String?
             var completedTool = false
             for try await event in turn.events {
                 switch event {
+                case .reasoningSummaryDelta(let delta): reasoning += delta
+                case .reasoningSummaryCompleted: reasoningCompleted = true
                 case .textDelta(let delta): text += delta
                 case .toolStarted(_, let name, _): startedTool = name
                 case .toolCompleted: completedTool = true
                 default: break
                 }
             }
-            return (text, startedTool, completedTool)
+            return (text, reasoning, reasoningCompleted, startedTool, completedTool)
         }
 
+        await fake.emit(.notification(
+            method: "item/reasoning/summaryTextDelta",
+            params: .object([
+                "threadId": .string("thread-test"),
+                "turnId": .string("turn-test"),
+                "itemId": .string("reasoning-1"),
+                "summaryIndex": .number(0),
+                "delta": .string("Inspected the project context."),
+            ])
+        ))
         await fake.emit(.notification(
             method: "item/agentMessage/delta",
             params: .object([
@@ -216,8 +231,10 @@ struct CodexProviderTests {
         ))
         let result = try await collection.value
         #expect(result.0 == "Timeline inspected.")
-        #expect(result.1 == "get_timeline")
+        #expect(result.1 == "Inspected the project context.")
         #expect(result.2)
+        #expect(result.3 == "get_timeline")
+        #expect(result.4)
     }
 
     @Test func resumesPersistedThreadWithCurrentSafetySettings() async throws {

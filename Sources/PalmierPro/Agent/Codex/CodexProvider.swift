@@ -233,6 +233,10 @@ final class CodexProvider: AgentProviderRuntime {
         if let turnID = params["turnId"]?.stringValue, turnID != active.turnID { return }
 
         switch method {
+        case "item/reasoning/summaryTextDelta":
+            if let delta = params["delta"]?.stringValue, !delta.isEmpty {
+                active.continuation.yield(.reasoningSummaryDelta(delta))
+            }
         case "item/agentMessage/delta":
             if let delta = params["delta"]?.stringValue, !delta.isEmpty {
                 active.continuation.yield(.textDelta(delta))
@@ -240,6 +244,7 @@ final class CodexProvider: AgentProviderRuntime {
         case "turn/completed":
             let status = params["turn"]?["status"]?.stringValue
             if status == "completed" {
+                active.continuation.yield(.reasoningSummaryCompleted)
                 active.continuation.yield(.completed)
                 active.continuation.finish()
             } else if status == "interrupted" {
