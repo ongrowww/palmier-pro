@@ -49,6 +49,7 @@ enum Analytics {
         case editorEditCommitted = "editor edit committed"
         case generationSubmitted = "generation submitted"
         case mcpSessionActivated = "mcp session activated"
+        case onboardingCompleted = "onboarding completed"
     }
 
     #if PRODUCTION_TELEMETRY
@@ -82,6 +83,14 @@ enum Analytics {
     nonisolated(unsafe) private static var didStart = false
     nonisolated(unsafe) private static var activeProjectMarks: Set<String> = []
     private static let lock = NSLock()
+
+    static var canCapture: Bool {
+        #if PRODUCTION_TELEMETRY
+        didStart && isEnabled
+        #else
+        false
+        #endif
+    }
 
     static func start() {
         #if PRODUCTION_TELEMETRY
@@ -128,7 +137,7 @@ enum Analytics {
     @discardableResult
     static func capture(_ event: Event, properties: Payload = [:]) -> Bool {
         #if PRODUCTION_TELEMETRY
-        guard didStart, isEnabled else { return false }
+        guard canCapture else { return false }
         let properties = cleanedPayload(properties)
         guard let data = try? JSONSerialization.data(withJSONObject: properties) else { return false }
         captureQueue.async {
@@ -210,42 +219,54 @@ enum Analytics {
     private static var allowedCapturePropertyKeys: Set<String> {
         Set([
             "active_day",
+            "caption_clip_count",
+            "caption_group_count",
+            "clip_count",
             "client_info",
             "error_message",
             "export_duration_seconds",
+            "export_filename",
             "failure_reason",
             "format",
+            "generated_visual_clip_count",
+            "generated_visual_clip_ratio",
+            "generated_visual_duration_ratio",
             "generation_type",
+            "imported_visual_clip_count",
+            "interests",
             "mode",
             "model",
             "output_count",
             "project_id",
             "resolution",
+            "roles",
             "session_id",
             "source",
             "starter_prompt",
             "status",
+            "survey_version",
+            "timeline_count",
             "timeline_changed",
+            "timeline_snapshot",
+            "timeline_snapshot_schema",
+            "track_count",
             "tool_name",
             "tool_duration_seconds",
+            "upscaled_visual_clip_count",
+            "video_types",
+            "visual_clip_count",
         ])
     }
 
-    private static func clean(_ value: Any) -> Any? {
+    static func clean(_ value: Any) -> Any? {
         switch value {
         case let value as String:
             return value
-        case let value as Bool:
-            return value
-        case let value as Int:
-            return value
-        case let value as Double:
-            guard value.isFinite else { return nil }
-            return value
-        case let value as Float:
-            guard value.isFinite else { return nil }
-            return Double(value)
         case let value as NSNumber:
+            if CFGetTypeID(value) == CFBooleanGetTypeID() {
+                return value.boolValue
+            }
+            guard value.doubleValue.isFinite else { return nil }
             return value
         case let value as [String: Any]:
             var out: [String: Any] = [:]

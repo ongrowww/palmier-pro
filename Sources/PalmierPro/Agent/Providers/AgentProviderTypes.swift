@@ -104,6 +104,8 @@ struct AgentApprovalRequest: Identifiable, Equatable, Sendable {
 }
 
 enum AgentProviderEvent: Sendable {
+    case reasoningSummaryDelta(String)
+    case reasoningSummaryCompleted
     case textDelta(String)
     case toolStarted(id: String, name: String, inputJSON: String)
     case toolCompleted(id: String, content: [ToolResult.Block], isError: Bool)
