@@ -129,5 +129,30 @@ changes implemented`, or `feature explicitly unavailable`. A conflict-free
 merge and green build/test jobs alone do not establish BYOK feature parity.
 The workflow never merges a pull request by itself.
 
+### Tracked fal.ai video availability
+
+The BYOK model menu keeps unavailable upstream video features visible but
+disabled. `FALPreviewCatalog.upcomingVideo` is the machine-tested source of
+truth for this queue:
+
+| Model | Current state | Activation work |
+| --- | --- | --- |
+| FLUX.3 Video | No validated public fal.ai endpoint | Add catalog capabilities, draft/enhance request mapping, pricing, and tests when fal.ai publishes the API. |
+| MiniMax H3 | No validated public fal.ai endpoint | Add text/image/reference-video mapping, pricing, and tests when fal.ai publishes the API. |
+| Seedance 2.5 | Announced by fal.ai; API not released | Replace the disabled entry only after final endpoint schemas, constraints, and pricing are public. |
+
+Every upstream parity review must recheck this table against fal.ai's official
+model documentation. A tracked item moves into the executable catalog only
+when its public endpoint, request schema, limits, output shape, and price can be
+validated and covered by planner tests. MiniMax Hailuo 2.3 Standard and Pro are
+independent models and are already connected through their published text- and
+image-to-video endpoints.
+
+Availability and request contracts are checked against fal.ai's official
+[Hailuo 2.3 Standard](https://fal.ai/models/fal-ai/minimax/hailuo-2.3/standard/text-to-video/api),
+[Hailuo 2.3 Pro](https://fal.ai/models/fal-ai/minimax/hailuo-2.3/pro/text-to-video/api),
+and [Seedance 2.5 availability](https://fal.ai/learn/tools/what-is-seedance-2-5)
+pages. Recheck those sources before changing an item from tracked to executable.
+
 Scheduled and manual runs are active because the workflow exists on the fork's
 default branch. Fork Issues are enabled for conflict escalation.

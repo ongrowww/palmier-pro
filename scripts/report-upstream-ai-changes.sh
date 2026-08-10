@@ -80,7 +80,7 @@ printf -- '- [ ] Review the upstream changelog for new or changed AI features.\n
 printf -- '- [ ] Review generation models, capabilities, inputs, and settings.\n'
 printf -- '- [ ] Review AI Edit actions and their source-media requirements.\n'
 printf -- '- [ ] Review Agent generation tools for the same provider parity.\n'
-printf -- '- [ ] Review BYOK endpoint mapping, validation, pricing, and tests.\n'
+printf -- '- [ ] Review BYOK endpoint mapping, tracked fal.ai availability, pricing, and tests.\n'
 printf -- '- [ ] Complete affected smoke tests, or document why none are required.\n\n'
 printf '## Parity decision\n\n'
 printf -- '- Decision: TODO\n'

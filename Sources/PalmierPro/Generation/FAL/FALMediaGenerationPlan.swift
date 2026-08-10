@@ -107,6 +107,8 @@ enum FALVideoGenerationPlanner {
         "bytedance/seedance-2.0",
         "fal-ai/kling-video/v3/standard",
         "fal-ai/veo3.1",
+        "fal-ai/minimax/hailuo-2.3/standard",
+        "fal-ai/minimax/hailuo-2.3/pro",
         "fal-ai/ltx-2.3/reframe",
         "veed/lipsync/v2",
     ])
@@ -240,6 +242,27 @@ enum FALVideoGenerationPlanner {
                 endpoint = model.id
             }
 
+        case "fal-ai/minimax/hailuo-2.3/standard",
+             "fal-ai/minimax/hailuo-2.3/pro":
+            let isStandard = model.id.hasSuffix("/standard")
+            let allowedDurations = isStandard ? [6, 10] : [6]
+            let requiredResolution = isStandard ? "768p" : "1080p"
+            guard allowedDurations.contains(duration),
+                  resolution == requiredResolution,
+                  inputAssets.frames.count <= 1,
+                  inputAssets.allRefs.isEmpty
+            else { throw FALMediaGenerationError.invalidSettings }
+            request = ["prompt": .string(prompt)]
+            if isStandard {
+                request["duration"] = .string("\(duration)")
+            }
+            if let first = inputAssets.frames.first {
+                endpoint = "\(model.id)/image-to-video"
+                uploads.append(upload(first, target: .scalar("image_url")))
+            } else {
+                endpoint = "\(model.id)/text-to-video"
+            }
+
         case "fal-ai/ltx-2.3/reframe":
             guard let source = inputAssets.sourceVideo,
                   (1...60).contains(duration),
@@ -338,6 +361,15 @@ enum FALVideoGenerationPlanner {
                 return duration * (generateAudio ? 600_000 : 400_000)
             }
             return duration * (generateAudio ? 400_000 : 200_000)
+        case "fal-ai/minimax/hailuo-2.3/standard":
+            switch duration {
+            case 6: return 280_000
+            case 10: return 560_000
+            default: throw FALMediaGenerationError.invalidSettings
+            }
+        case "fal-ai/minimax/hailuo-2.3/pro":
+            guard duration == 6 else { throw FALMediaGenerationError.invalidSettings }
+            return 490_000
         case "fal-ai/ltx-2.3/reframe":
             guard let resolution else { throw FALMediaGenerationError.invalidSettings }
             switch resolution {
