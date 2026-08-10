@@ -77,6 +77,7 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
         id: String,
         startFrame: Int,
         durationFrames: Int,
+        captionDurationFrames: Int? = nil,
         hasWordTiming: Bool = true
     ) -> CaptionSpecBuilder.Target {
         let clip = Fixtures.clip(
@@ -86,11 +87,12 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
             start: startFrame,
             duration: durationFrames
         )
+        let captionDuration = Double(captionDurationFrames ?? min(21, durationFrames)) / 30
         let result = TranscriptionResult(
             text: id,
             language: "en",
-            words: hasWordTiming ? [TranscriptionWord(text: id, start: 0, end: 0.1)] : [],
-            segments: [TranscriptionSegment(text: id, start: 0, end: 0.2)]
+            words: hasWordTiming ? [TranscriptionWord(text: id, start: 0, end: captionDuration)] : [],
+            segments: [TranscriptionSegment(text: id, start: 0, end: captionDuration)]
         )
         return CaptionSpecBuilder.Target(
             clip: clip,
@@ -101,17 +103,21 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
     private func input(
         targets: [CaptionSpecBuilder.Target],
         maximumGapSeconds: Double = CaptionGapSettings.default.maximumGapSeconds,
+        timelineEndFrame: Int? = nil,
+        maxCharacters: Int? = nil,
         animation: TextAnimation? = nil
     ) -> CaptionSpecBuilder.Input {
         CaptionSpecBuilder.Input(
             targets: targets,
             fps: 30,
+            timelineEndFrame: timelineEndFrame ?? targets.map(\.clip.endFrame).max() ?? 0,
             canvasWidth: 1920,
             canvasHeight: 1080,
             style: TextStyle(),
             center: CGPoint(x: 0.5, y: 0.8),
             textCase: .auto,
             maxWords: nil,
+            maxCharacters: maxCharacters,
             gapSettings: CaptionGapSettings(maximumGapSeconds: maximumGapSeconds) ?? .default,
             animation: animation
         )
@@ -137,12 +143,14 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
         let input = CaptionSpecBuilder.Input(
             targets: [.init(clip: clip, result: result)],
             fps: 30,
+            timelineEndFrame: clip.endFrame,
             canvasWidth: 1920,
             canvasHeight: 1080,
             style: TextStyle(),
             center: CGPoint(x: 0.5, y: 0.8),
             textCase: .upper,
             maxWords: nil,
+            maxCharacters: nil,
             gapSettings: .default,
             animation: nil
         )
@@ -153,21 +161,48 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
         #expect(specs.count == 1)
         #expect(spec.content == "HELLO WORLD")
         #expect(spec.startFrame == 30)
-        #expect(spec.durationFrames == 30)
+        #expect(spec.durationFrames == 45)
         #expect(spec.transform != nil)
         #expect(spec.words?.map(\.text) == ["hello", "world"])
     }
 
+    @Test func appliesCharacterCapWhenBuildingCaptionSpecs() async throws {
+        let clip = Fixtures.clip(
+            mediaRef: "media",
+            mediaType: .audio,
+            start: 0,
+            duration: 90
+        )
+        let result = TranscriptionResult(
+            text: "one two three",
+            language: "en",
+            words: [
+                TranscriptionWord(text: "one", start: 0, end: 0.2),
+                TranscriptionWord(text: "two", start: 0.3, end: 0.5),
+                TranscriptionWord(text: "three", start: 0.6, end: 0.8),
+            ],
+            segments: [TranscriptionSegment(text: "one two three", start: 0, end: 0.8)]
+        )
+
+        let specs = try await CaptionSpecBuilder.build(input(
+            targets: [.init(clip: clip, result: result)],
+            maxCharacters: 7
+        ))
+
+        #expect(specs.map(\.content) == ["one", "two", "three"])
+    }
+
     @Test(arguments: [
-        (6, 0.25, 27),
-        (7, 0.25, 28),
-        (8, 0.25, 21),
-        (6, 0.0, 21),
+        (6, 0.25, 27, 28),
+        (7, 0.25, 28, 28),
+        (8, 0.25, 21, 28),
+        (6, 0.0, 21, 21),
     ])
     func closesOnlyGapsWithinTheFrameRoundedThreshold(
         gapFrames: Int,
         maximumGapSeconds: Double,
-        expectedFirstDuration: Int
+        expectedFirstDuration: Int,
+        expectedLastDuration: Int
     ) async throws {
         let specs = try await CaptionSpecBuilder.build(input(
             targets: [
@@ -182,8 +217,8 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
         ))
 
         #expect(specs.map(\.startFrame) == [0, 21 + gapFrames])
-        #expect(specs.map(\.durationFrames) == [expectedFirstDuration, 21])
-        #expect(specs[0].words == [WordTiming(text: "one", startFrame: 0, endFrame: 3)])
+        #expect(specs.map(\.durationFrames) == [expectedFirstDuration, expectedLastDuration])
+        #expect(specs[0].words == [WordTiming(text: "one", startFrame: 0, endFrame: 21)])
     }
 
     @Test(arguments: [
@@ -196,7 +231,7 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
         .wordPop,
         .wordCycle,
     ])
-    func holdsPreviousCaptionThroughTransparentAnimatedEntry(
+    func closesAnimatedCaptionGapWithoutOverlap(
         preset: TextAnimation.Preset
     ) async throws {
         let specs = try await CaptionSpecBuilder.build(input(
@@ -207,11 +242,13 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
             animation: TextAnimation(preset: preset)
         ))
 
-        #expect(specs.map(\.durationFrames) == [28, 21])
-        #expect(specs[0].words?.last?.endFrame == (preset == .wordCycle ? 28 : 3))
+        #expect(specs.map(\.durationFrames) == [27, 30])
+        #expect(specs[0].startFrame + specs[0].durationFrames == specs[1].startFrame)
+        #expect(specs[0].words?.last?.endFrame == (preset == .wordCycle ? 27 : 21))
+        #expect(specs[1].words?.last?.endFrame == (preset == .wordCycle ? 30 : 21))
     }
 
-    @Test func oneFrameAnimatedCaptionOwnsTheFollowingGap() async throws {
+    @Test func oneFrameAnimatedCaptionClosesTheFollowingGapWithoutOverlap() async throws {
         let specs = try await CaptionSpecBuilder.build(input(
             targets: [
                 gapTarget(id: "one", startFrame: 0, durationFrames: 21),
@@ -221,30 +258,139 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
             animation: TextAnimation(preset: .fadeIn)
         ))
 
-        #expect(specs.map(\.durationFrames) == [28, 7, 21])
+        #expect(specs.map(\.durationFrames) == [27, 6, 30])
+        #expect(specs[0].startFrame + specs[0].durationFrames == specs[1].startFrame)
+        #expect(specs[1].startFrame + specs[1].durationFrames == specs[2].startFrame)
     }
 
-    @Test func leavesOverlapsUnchanged() async throws {
-        let overlapping = try await CaptionSpecBuilder.build(input(targets: [
-            gapTarget(id: "one", startFrame: 0, durationFrames: 21),
-            gapTarget(id: "two", startFrame: 20, durationFrames: 30),
-        ]))
+    @Test func trimsOverlapsWhenGapClosingIsDisabled() async throws {
+        let specs = try await CaptionSpecBuilder.build(input(
+            targets: [
+                gapTarget(id: "one", startFrame: 0, durationFrames: 21),
+                gapTarget(id: "two", startFrame: 20, durationFrames: 30),
+            ],
+            maximumGapSeconds: 0
+        ))
 
-        #expect(overlapping.map(\.durationFrames) == [21, 21])
+        #expect(specs.map(\.startFrame) == [0, 20])
+        #expect(specs.map(\.durationFrames) == [20, 21])
+        #expect(specs[0].words?.last?.endFrame == 20)
     }
 
-    @Test func closesGapFromTheClipProvidingLatestCoverage() async throws {
+    @Test func trimsNestedOverlapsWithoutExtendingAcrossALongGap() async throws {
         let specs = try await CaptionSpecBuilder.build(input(targets: [
             gapTarget(id: "outer", startFrame: 0, durationFrames: 40),
             gapTarget(id: "nested", startFrame: 10, durationFrames: 5),
-            gapTarget(id: "next", startFrame: 26, durationFrames: 30),
+            gapTarget(id: "next", startFrame: 31, durationFrames: 30),
         ]))
 
-        #expect(specs.map(\.durationFrames) == [26, 5, 21])
+        #expect(specs.map(\.startFrame) == [0, 10, 31])
+        #expect(specs.map(\.durationFrames) == [10, 5, 30])
+    }
+
+    @Test func shorterPreviousCaptionOwnsOverlappingFrames() async throws {
+        let specs = try await CaptionSpecBuilder.build(input(
+            targets: [
+                gapTarget(id: "one", startFrame: 0, durationFrames: 5),
+                gapTarget(id: "two", startFrame: 4, durationFrames: 21),
+            ],
+            maximumGapSeconds: 0
+        ))
+
+        #expect(specs.map(\.content) == ["one", "two"])
+        #expect(specs.map(\.startFrame) == [0, 5])
+        #expect(specs.map(\.durationFrames) == [5, 20])
+        #expect(specs[1].words == [WordTiming(text: "two", startFrame: 0, endFrame: 20)])
+    }
+
+    @Test func shorterNextCaptionOwnsOverlappingFrames() async throws {
+        let specs = try await CaptionSpecBuilder.build(input(
+            targets: [
+                gapTarget(id: "one", startFrame: 0, durationFrames: 21),
+                gapTarget(id: "two", startFrame: 20, durationFrames: 5),
+            ],
+            maximumGapSeconds: 0
+        ))
+
+        #expect(specs.map(\.content) == ["one", "two"])
+        #expect(specs.map(\.startFrame) == [0, 20])
+        #expect(specs.map(\.durationFrames) == [20, 5])
+    }
+
+    @Test func laterCaptionWinsEqualDurationTie() async throws {
+        let specs = try await CaptionSpecBuilder.build(input(
+            targets: [
+                gapTarget(id: "one", startFrame: 0, durationFrames: 5),
+                gapTarget(id: "two", startFrame: 4, durationFrames: 5),
+            ],
+            maximumGapSeconds: 0
+        ))
+
+        #expect(specs.map(\.startFrame) == [0, 4])
+        #expect(specs.map(\.durationFrames) == [4, 5])
+    }
+
+    @Test func sameFrameCaptionsRemainSeparateAndCapped() async throws {
+        let specs = try await CaptionSpecBuilder.build(input(
+            targets: [
+                gapTarget(id: "one", startFrame: 0, durationFrames: 21),
+                gapTarget(id: "two", startFrame: 0, durationFrames: 5),
+            ],
+            maximumGapSeconds: 0,
+            maxCharacters: 3
+        ))
+
+        #expect(specs.map(\.content) == ["one", "two"])
+        #expect(specs.map(\.startFrame) == [0, 1])
+        #expect(specs.map(\.durationFrames) == [1, 4])
+        #expect(specs.allSatisfy { $0.content.count <= 3 })
+        #expect(specs[1].words == [WordTiming(text: "two", startFrame: 0, endFrame: 4)])
+    }
+
+    @Test func sameFrameCollisionChainPreservesEveryCaption() async throws {
+        let specs = try await CaptionSpecBuilder.build(input(
+            targets: [
+                gapTarget(id: "aaa", startFrame: 0, durationFrames: 3),
+                gapTarget(id: "bb", startFrame: 0, durationFrames: 2),
+                gapTarget(id: "c", startFrame: 0, durationFrames: 1),
+            ],
+            maximumGapSeconds: 0,
+            maxCharacters: 3
+        ))
+
+        #expect(specs.map(\.content) == ["aaa", "bb", "c"])
+        #expect(specs.map(\.startFrame) == [0, 1, 2])
+        #expect(specs.map(\.durationFrames) == [1, 1, 1])
+    }
+
+    @Test(arguments: [
+        (100, 0.5, 16),
+        (10, 0.5, 10),
+        (100, 0.0, 1),
+    ])
+    func holdsTheFinalCaptionWithinTheTimeline(
+        timelineEndFrame: Int,
+        maximumGapSeconds: Double,
+        expectedDuration: Int
+    ) async throws {
+        let specs = try await CaptionSpecBuilder.build(input(
+            targets: [
+                gapTarget(
+                    id: "last",
+                    startFrame: 0,
+                    durationFrames: timelineEndFrame,
+                    captionDurationFrames: 1
+                )
+            ],
+            maximumGapSeconds: maximumGapSeconds,
+            timelineEndFrame: timelineEndFrame
+        ))
+
+        #expect(specs.map(\.durationFrames) == [expectedDuration])
     }
 
     @Test func captionGapSettingsValidateAndRoundDownToFrames() {
-        #expect(CaptionGapSettings.default.maximumGapFrames(fps: 30) == 7)
+        #expect(CaptionGapSettings.default.maximumGapFrames(fps: 30) == 15)
         #expect(CaptionGapSettings(maximumGapSeconds: 0)?.maximumGapFrames(fps: 30) == 0)
         #expect(CaptionGapSettings(maximumGapSeconds: -0.1) == nil)
         #expect(CaptionGapSettings(maximumGapSeconds: 2.1) == nil)
@@ -371,6 +517,41 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
 
 @MainActor
 @Suite struct CaptionProjectionTests {
+    @Test(arguments: [true, false])
+    func preservesShortTimingsAcrossTranscriptSegments(hasWordTimings: Bool) {
+        let clip = Fixtures.clip(
+            mediaRef: "media",
+            mediaType: .audio,
+            start: 0,
+            duration: 60
+        )
+        let result = TranscriptionResult(
+            text: "Sophie? Hi,",
+            language: "en",
+            words: hasWordTimings ? [
+                TranscriptionWord(text: "Sophie?", start: 0, end: 0.2),
+                TranscriptionWord(text: "Hi,", start: 0.3, end: 0.5),
+            ] : [],
+            segments: [
+                TranscriptionSegment(text: "Sophie?", start: 0, end: 0.2),
+                TranscriptionSegment(text: "Hi,", start: 0.3, end: 0.5),
+            ]
+        )
+
+        let phrases = CaptionTranscriptMapper.phrases(
+            for: clip,
+            result: result,
+            fps: 30,
+            maxWords: nil,
+            maxCharacters: 4,
+            fits: { _ in true }
+        )
+
+        #expect(phrases.map(\.text) == ["Sophie?", "Hi,"])
+        #expect(phrases.map(\.start) == [0, 0.3])
+        #expect(phrases.map(\.end) == [0.2, 0.5])
+    }
+
     @Test func phrasesIgnoreWordsOutsideCurrentClipFragments() {
         let first = Fixtures.clip(id: "first", mediaRef: "media-1", mediaType: .audio, start: 0, duration: 30, trimStart: 0)
         let second = Fixtures.clip(id: "second", mediaRef: "media-1", mediaType: .audio, start: 30, duration: 30, trimStart: 60)
@@ -386,10 +567,12 @@ private func mediaAsset(_ id: String, hasAudio: Bool = true) -> MediaAsset {
         )
 
         let firstPhrases = CaptionTranscriptMapper.phrases(
-            for: first, result: result, fps: 30, maxWords: nil, minDuration: 0, fits: { _ in true }
+            for: first, result: result, fps: 30, maxWords: nil, maxCharacters: nil,
+            fits: { _ in true }
         )
         let secondPhrases = CaptionTranscriptMapper.phrases(
-            for: second, result: result, fps: 30, maxWords: nil, minDuration: 0, fits: { _ in true }
+            for: second, result: result, fps: 30, maxWords: nil, maxCharacters: nil,
+            fits: { _ in true }
         )
 
         #expect(firstPhrases.map(\.text) == ["keep"])

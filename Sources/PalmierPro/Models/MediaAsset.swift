@@ -81,6 +81,22 @@ final class MediaAsset: Identifiable {
     }
 
     var isGenerated: Bool { generationInput != nil }
+
+    var canEnhanceDraft: Bool {
+        guard generationStatus == .none, let input = generationInput else { return false }
+        return input.draft == true
+            && input.backendJobId != nil
+            && (input.resultURLs?.count ?? 0) >= 2
+    }
+
+    var draftEnhancementCost: Int? {
+        guard let input = generationInput, input.draft == true,
+              case .video(let model) = ModelRegistry.byId[input.model],
+              let rate = model.draftEnhanceCreditsPerSecond,
+              input.duration > 0 else { return nil }
+        return Int((rate * Double(input.duration)).rounded(.up))
+    }
+
     var resolvedDuration: Double {
         if duration.isFinite, duration > 0 { return duration }
         if let generated = generationInput?.duration, generated > 0 { return Double(generated) }
@@ -166,7 +182,7 @@ final class MediaAsset: Identifiable {
             defer { releaseThumbnailPermit() }
             guard thumbnail == nil, !Task.isCancelled else { return }
             _ = await loadMetadata()
-        case .audio, .text, .sequence:
+        case .audio, .text, .sequence, .subtitle:
             break
         }
     }
@@ -222,6 +238,14 @@ final class MediaAsset: Identifiable {
             if includeThumbnail, let cg = info.thumbnail {
                 thumbnail = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
             }
+            return true
+        }
+
+        if type == .subtitle {
+            let subtitleURL = url
+            guard let cues = try? await SubtitleFileParser.parseFile(at: subtitleURL),
+                  !Task.isCancelled, url == subtitleURL else { return false }
+            duration = cues.map(\.endSeconds).max() ?? 0
             return true
         }
 

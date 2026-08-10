@@ -125,7 +125,6 @@ enum AppTheme {
         static let panelWidth: CGFloat = 32
         static let barWidth: CGFloat = 8
         static let refreshInterval: Double = 1.0 / 30.0
-        static let accessibilityRefreshInterval: Duration = .milliseconds(250)
         static let rulerStepDb: Float = 6
         static let rulerMajorStepDb: Float = 12
         static let yellowThresholdDb: Float = -20
@@ -189,6 +188,22 @@ enum AppTheme {
         static let warning = NSColor.systemOrange
 
         static var warningColor: Color { Color(warning) }
+    }
+
+    enum AgentActivity {
+        static let added = NSColor.systemGreen
+        static let mutated = NSColor.systemOrange
+        static let read = NSColor(
+            srgbRed: 0x64 / 255.0,
+            green: 0x74 / 255.0,
+            blue: 0x8B / 255.0,
+            alpha: 1
+        )
+        static let readFill = read.withAlphaComponent(AppTheme.Opacity.faint)
+        static let changeGlowOpacity: Float = 0.8
+        static let changeGlowRadius: CGFloat = 8
+        static let readGlowOpacity: Float = 0.35
+        static let readGlowRadius: CGFloat = 4
     }
 
     // MARK: - Text
@@ -258,6 +273,7 @@ enum AppTheme {
 
     enum Opacity {
         static let opaque: Double = 1
+        static let hitTarget: Double = 0.001
         static let subtle: Double = 0.04
         static let hint: Double = 0.06
         static let faint: Double = 0.08
@@ -386,7 +402,6 @@ enum AppTheme {
     }
 
     enum ComponentSize {
-        static let captionPreviewMaxHeight: CGFloat = 150
         static let captionPreviewMaxTextWidthRatio: CGFloat = 0.9
         static let toolImagePreviewMaxHeight: CGFloat = 50
         static let projectCardWidth: CGFloat = 150
@@ -394,7 +409,9 @@ enum AppTheme {
         static let projectSearchWidth: CGFloat = 260
         static let timelineClipBorderMinWidth: CGFloat = 8
         static let timelineClipDetailMinWidth: CGFloat = 32
+        static let timelineClipControlsMinWidth: CGFloat = 48
         static let timelineTabRenameWidth: CGFloat = 120
+        static let timelineTrackHeaderWidth: CGFloat = 160
         static let timelineClipLabelMinWidth: CGFloat = 56
         static let timelineBadgePadH: CGFloat = 4
         static let timelineBadgePadV: CGFloat = 1
@@ -416,7 +433,7 @@ enum AppTheme {
         static let skillsSearchWidth: CGFloat = 260
         static let skillRowIconFrame: CGFloat = 42
         static let skillStatusWidth: CGFloat = 124
-        static let skillActionWidth: CGFloat = 72
+        static let skillActionWidth: CGFloat = 112
         static let skillDetailWidth: CGFloat = 720
         static let skillDetailMinHeight: CGFloat = 600
         static let skillToastWidth: CGFloat = 380
@@ -452,13 +469,10 @@ enum AppTheme {
 
     enum Caption {
         static let defaultFontSize: Double = 48
-        static let minPosition: Double = 0
-        static let maxPosition: Double = 1
         static let centerSnapValue: CGFloat = 0.5
         static let centerSnapThreshold: Double = 0.02
         static let defaultCenterY: CGFloat = 0.9
         static let defaultCenter = CGPoint(x: centerSnapValue, y: defaultCenterY)
-        static let minDisplayDuration: Double = 0.7
     }
 
     enum GenerationPanel {
@@ -473,7 +487,7 @@ enum AppTheme {
 
     enum MediaPanel {
         static let tabRailWidth: CGFloat = IconSize.lg + Spacing.sm * 2
-        static let contextRowHeight: CGFloat = IconSize.md
+        static let contextRowHeight: CGFloat = IconSize.smMd
     }
 
     enum Export {
@@ -514,6 +528,12 @@ enum AppTheme {
         static let transition: Double = 0.2
         static let pulse: Double = 0.8
         static let slipPreviewRefresh: Duration = .milliseconds(67)
+        static let agentChangeHighlightHold: Double = 1.0
+        static let agentChangeHighlightFade: Double = 0.3
+        static let agentChangeHighlightDuration = agentChangeHighlightHold + agentChangeHighlightFade
+        static let agentReadHighlightHold: Double = 0.7
+        static let agentReadHighlightFade: Double = 0.25
+        static let agentReadHighlightDuration = agentReadHighlightHold + agentReadHighlightFade
     }
 }
 
@@ -545,6 +565,7 @@ extension ClipType {
         case .text: AppTheme.TrackColor.text
         case .lottie: AppTheme.TrackColor.lottie
         case .sequence: AppTheme.TrackColor.sequence
+        case .subtitle: AppTheme.TrackColor.text
         }
     }
 

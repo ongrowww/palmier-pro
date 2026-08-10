@@ -33,6 +33,7 @@
 "%lld of %lld credits remaining this period" = "%lld of %lld credits remaining this period";
 "%lld sections" = "%lld sections";
 "%lld selected" = "%lld selected";
+"%lld subtitle files are ready in Palmier Pro." = "%lld subtitle files are ready in Palmier Pro.";
 "%lld text clips are ready in Palmier Pro." = "%lld text clips are ready in Palmier Pro.";
 "%lld videos are ready in Palmier Pro." = "%lld videos are ready in Palmier Pro.";
 "%lld/%lld" = "%lld/%lld";
@@ -142,12 +143,13 @@
 "Buy more" = "Buy more";
 "Cache" = "Cache";
 "Cached — no credits used." = "Cached — no credits used.";
+"Can't add captions from \"%@\" — %@" = "Can't add captions from \"%@\" — %@";
+"Can't add captions — \"%@\" is offline." = "Can't add captions — \"%@\" is offline.";
 "Can't delete every timeline — the project needs at least one." = "Can't delete every timeline — the project needs at least one.";
 "Can't import \"%@\" — not a Lottie animation." = "Can't import \"%@\" — not a Lottie animation.";
 "Can't import \"%@\" — unsupported file type." = "Can't import \"%@\" — unsupported file type.";
 "Can't paste \"%@\" here — it would nest this timeline inside itself." = "Can't paste \"%@\" here — it would nest this timeline inside itself.";
 "Can't relink \"%@\". Required media type: %@. Selected media type: %@." = "Can't relink \"%@\". Required media type: %@. Selected media type: %@.";
-"Can't swap this clip. Required media type: %@." = "Can't swap this clip. Required media type: %@.";
 "Can't unlock sync on a multicam track — \"%@\" stays aligned through it." = "Can't unlock sync on a multicam track — \"%@\" stays aligned through it.";
 "Cancel" = "Cancel";
 "Cancel Export" = "Cancel Export";
@@ -157,6 +159,7 @@
 "Canceling" = "Canceling";
 "Cancels %@" = "Cancels %@";
 "Canvas Zoom" = "Canvas Zoom";
+"Cap characters per caption, including spaces and punctuation. A single word may exceed the limit." = "Cap characters per caption, including spaces and punctuation. A single word may exceed the limit.";
 "Cap the words shown per caption. None fits each line to the box." = "Cap the words shown per caption. None fits each line to the box.";
 "Captions" = "Captions";
 "Captions will look like this" = "Captions will look like this";
@@ -246,6 +249,7 @@
 "Copy Details" = "Copy Details";
 "Copy Path" = "Copy Path";
 "Copy message" = "Copy message";
+"Copy one clip of the same type and try again." = "Copy one clip of the same type and try again.";
 "Copy prompt" = "Copy prompt";
 "Corner Radius" = "Corner Radius";
 "Could not install the on-device speech model: %@" = "Could not install the on-device speech model: %@";
@@ -268,7 +272,6 @@
 "Crop" = "Crop";
 "Crop applies to one clip at a time" = "Crop applies to one clip at a time";
 "Curves" = "Curves";
-"Custom" = "Custom";
 "Custom Aspect Ratio" = "Custom Aspect Ratio";
 "Custom…" = "Custom…";
 "Cut" = "Cut";
@@ -312,7 +315,6 @@
 "Designer" = "Designer";
 "Destination" = "Destination";
 "Detail" = "Detail";
-"Details" = "Details";
 "Detect Beats" = "Detect Beats";
 "Detected %lld beats at %lld BPM." = "Detected %lld beats at %lld BPM.";
 "Detected %lld beats." = "Detected %lld beats.";
@@ -329,6 +331,8 @@
 "Downloading the on-device model that powers visual search." = "Downloading the on-device model that powers visual search.";
 "Downloading…" = "Downloading…";
 "Downloads a %@ on-device model so you can search media visually." = "Downloads a %@ on-device model so you can search media visually.";
+"Draft" = "Draft";
+"Draft already enhanced or cache unavailable" = "Draft already enhanced or cache unavailable";
 "Drag to add or shape a point · double-click to remove" = "Drag to add or shape a point · double-click to remove";
 "Drop files here or import from disk" = "Drop files here or import from disk";
 "Dubbing" = "Dubbing";
@@ -348,6 +352,7 @@
 "Edit doesn't support Lottie" = "Edit doesn't support Lottie";
 "Edit doesn't support audio" = "Edit doesn't support audio";
 "Edit doesn't support sequences" = "Edit doesn't support sequences";
+"Edit doesn't support subtitles" = "Edit doesn't support subtitles";
 "Edit doesn't support text" = "Edit doesn't support text";
 "Edit model not available" = "Edit model not available";
 "Edit supports up to %llds (this is %llds)" = "Edit supports up to %llds (this is %llds)";
@@ -362,6 +367,7 @@
 "Enhance" = "Enhance";
 "Enhance resolution or frame rate with AI" = "Enhance resolution or frame rate with AI";
 "Enter FAL API key" = "Enter FAL API key";
+"Enhanced with FLUX.3 at 1080p." = "Enhanced with FLUX.3 at 1080p.";
 "Enter Full Screen" = "Enter Full Screen";
 "Estimated cost. Actual billing may differ slightly." = "Estimated cost. Actual billing may differ slightly.";
 "Exclusion" = "Exclusion";
@@ -376,9 +382,11 @@
 "Exporting…" = "Exporting…";
 "Export…" = "Export…";
 "Exposure" = "Exposure";
-"Extends a caption to close gaps up to this duration." = "Extends a caption to close gaps up to this duration.";
+"Extend" = "Extend";
+"Extends captions across short gaps and holds the final caption." = "Extends captions across short gaps and holds the final caption.";
 "Extra Large" = "Extra Large";
 "FAL integration preview" = "FAL integration preview";
+"FLUX Enhance" = "FLUX Enhance";
 "Fade In" = "Fade In";
 "Fade Out" = "Fade Out";
 "Failed" = "Failed";
@@ -411,6 +419,7 @@
 "Founder" = "Founder";
 "Frame Rate" = "Frame Rate";
 "Free" = "Free";
+"Freeform" = "Freeform";
 "Full Frame" = "Full Frame";
 "Full Screen" = "Full Screen";
 "Full changelog" = "Full changelog";
@@ -426,6 +435,7 @@
 "Generate SFX" = "Generate SFX";
 "Generate SFX only works on video" = "Generate SFX only works on video";
 "Generate SFX…" = "Generate SFX…";
+"Generate a lower-cost 720p preview that can be enhanced later." = "Generate a lower-cost 720p preview that can be enhanced later.";
 "Generate audio" = "Generate audio";
 "Generate music for the timeline" = "Generate music for the timeline";
 "Generate music that fits the video" = "Generate music that fits the video";
@@ -435,9 +445,9 @@
 "Generate · %@" = "Generate · %@";
 "Generate · %lld credits" = "Generate · %lld credits";
 "Generate · 1 credit" = "Generate · 1 credit";
-"Generated" = "Generated";
 "Generating…" = "Generating…";
 "Generation Failed" = "Generation Failed";
+"Generation Input" = "Generation Input";
 "Generation complete" = "Generation complete";
 "Generation in progress" = "Generation in progress";
 "Generation panel" = "Generation panel";
@@ -455,6 +465,7 @@
 "Hard Light" = "Hard Light";
 "Height" = "Height";
 "Help" = "Help";
+"Hide Info" = "Hide Info";
 "Hide keyframe timeline" = "Hide keyframe timeline";
 "Hide reasoning" = "Hide reasoning";
 "High" = "High";
@@ -513,7 +524,6 @@
 "Large" = "Large";
 "Last Frame" = "Last Frame";
 "Layout" = "Layout";
-"Left %lld dBFS, right %lld dBFS" = "Left %lld dBFS, right %lld dBFS";
 "Length of the generated music. It's placed at the playhead, or at the marked range start." = "Length of the generated music. It's placed at the playhead, or at the marked range start.";
 "Let Agent create captions for you. Choose a predefined task, or ask Agent in the chat." = "Let Agent create captions for you. Choose a predefined task, or ask Agent in the chat.";
 "Let Agent generate music for you. Choose a starter, or ask Agent in the chat." = "Let Agent generate music for you. Choose a starter, or ask Agent in the chat.";
@@ -571,6 +581,7 @@
 "Match mouth movement to replacement audio" = "Match mouth movement to replacement audio";
 "Matches voices across clips, transcribing untranscribed timeline clips first (uses credits). Transcripts and voice fingerprints are cached, so re-runs are fast." = "Matches voices across clips, transcribing untranscribed timeline clips first (uses credits). Transcripts and voice fingerprints are cached, so re-runs are fast.";
 "Max" = "Max";
+"Max characters" = "Max characters";
 "Max plan" = "Max plan";
 "Max words" = "Max words";
 "Maximize Focused Panel" = "Maximize Focused Panel";
@@ -687,6 +698,8 @@
 "Palmier loaded this clip's source file but couldn't prepare it for playback. The file may be corrupt or in an unsupported format." = "Palmier loaded this clip's source file but couldn't prepare it for playback. The file may be corrupt or in an unsupported format.";
 "Palmier uses your installed Codex CLI and its existing sign-in. Credentials stay with Codex." = "Palmier uses your installed Codex CLI and its existing sign-in. Credentials stay with Codex.";
 "Paste" = "Paste";
+"Paste Clip Settings" = "Paste Clip Settings";
+"Paste Settings" = "Paste Settings";
 "Path" = "Path";
 "Per line" = "Per line";
 "Per word" = "Per word";
@@ -696,7 +709,6 @@
 "PiP Top Right" = "PiP Top Right";
 "Pick a replacement for \"%@\"" = "Pick a replacement for \"%@\"";
 "Place on timeline" = "Place on timeline";
-"Placement" = "Placement";
 "Play / Pause" = "Play / Pause";
 "Playback" = "Playback";
 "Playback Speed" = "Playback Speed";
@@ -724,6 +736,7 @@
 "Range" = "Range";
 "Razor (C)" = "Razor (C)";
 "Razor Tool" = "Razor Tool";
+"Re-render the same motion at full quality in 1080p" = "Re-render the same motion at full quality in 1080p";
 "Reasoning effort" = "Reasoning effort";
 "Redetect Beats" = "Redetect Beats";
 "Redo" = "Redo";
@@ -761,6 +774,7 @@
 "Removing background noise…" = "Removing background noise…";
 "Rename" = "Rename";
 "Rename Skill" = "Rename Skill";
+"Rename Track" = "Rename Track";
 "Rendering" = "Rendering";
 "Rendering…" = "Rendering…";
 "Replace clip source" = "Replace clip source";
@@ -816,10 +830,12 @@
 "Search skills" = "Search skills";
 "Select" = "Select";
 "Select All" = "Select All";
+"Select All Clips on Track" = "Select All Clips on Track";
 "Select Forward on All Tracks" = "Select Forward on All Tracks";
 "Select Forward on Track" = "Select Forward on Track";
 "Select Range" = "Select Range";
 "Select a single clip to enable" = "Select a single clip to enable";
+"Select compatible clips and paste settings again." = "Select compatible clips and paste settings again.";
 "Select media files or folders to import" = "Select media files or folders to import";
 "Selected" = "Selected";
 "Selected Clips · %lld" = "Selected Clips · %lld";
@@ -845,6 +861,7 @@
 "Sharpen" = "Sharpen";
 "Short-form and social" = "Short-form and social";
 "Shortcuts" = "Shortcuts";
+"Show Info" = "Show Info";
 "Show in Finder" = "Show in Finder";
 "Show keyframe timeline" = "Show keyframe timeline";
 "Show notifications" = "Show notifications";
@@ -914,6 +931,8 @@
 "Subscribe" = "Subscribe";
 "Subscribe or add your own API key to use this model." = "Subscribe or add your own API key to use this model.";
 "Subscription" = "Subscription";
+"Subtitle" = "Subtitle";
+"Subtitle file is unavailable." = "Subtitle file is unavailable.";
 "Swap Media" = "Swap Media";
 "Swap the clip's media when generation completes. Speed, volume, trim, and transform are preserved." = "Swap the clip's media when generation completes. Speed, volume, trim, and transform are preserved.";
 "Switch Angle" = "Switch Angle";
@@ -950,19 +969,24 @@
 "This is your preview panel to play a selected media or the whole timeline." = "This is your preview panel to play a selected media or the whole timeline.";
 "This model cannot cap the output at 60 FPS." = "This model cannot cap the output at 60 FPS.";
 "This permanently removes %@." = "This permanently removes %@.";
+"This source can’t replace the clip." = "This source can’t replace the clip.";
+"Three-Stack" = "Three-Stack";
 "Three-Up" = "Three-Up";
 "Threshold" = "Threshold";
 "Thumbnail Size" = "Thumbnail Size";
+"Tilt" = "Tilt";
 "Timecode" = "Timecode";
 "Timeline" = "Timeline";
 "Timeline Format" = "Timeline Format";
 "Timeline colors" = "Timeline colors";
+"Timelines" = "Timelines";
 "Tint" = "Tint";
 "Tints waveforms by speaker. Voices are matched across clips using cloud transcripts." = "Tints waveforms by speaker. Voices are matched across clips using cloud transcripts.";
 "Toggle Agent Panel" = "Toggle Agent Panel";
 "Tone" = "Tone";
 "Tools" = "Tools";
 "Top / Bottom" = "Top / Bottom";
+"Track Name" = "Track Name";
 "Tracking" = "Tracking";
 "Transcribing…" = "Transcribing…";
 "Transcription failed: %@" = "Transcription failed: %@";
@@ -993,7 +1017,6 @@
 "Ungroup Multicam" = "Ungroup Multicam";
 "Unlink" = "Unlink";
 "Untitled" = "Untitled";
-"Up to %@" = "Up to %@";
 "Update" = "Update";
 "Update available" = "Update available";
 "Updating %@" = "Updating %@";
@@ -1072,6 +1095,7 @@
 "Your audio clip is ready." = "Your audio clip is ready.";
 "Your image is ready." = "Your image is ready.";
 "Your inspector for the selected clip — transform, adjust, audio, and more." = "Your inspector for the selected clip — transform, adjust, audio, and more.";
+"Your subtitle file is ready." = "Your subtitle file is ready.";
 "Your text clip is ready." = "Your text clip is ready.";
 "Your timeline: the top half is video, the bottom half is audio. Click a clip to inspect it — we've selected one for you." = "Your timeline: the top half is video, the bottom half is audio. Click a clip to inspect it — we've selected one for you.";
 "Your timeline: the top half is video, the bottom half is audio. This is where you edit." = "Your timeline: the top half is video, the bottom half is audio. This is where you edit.";

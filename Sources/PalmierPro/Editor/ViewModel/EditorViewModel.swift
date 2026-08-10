@@ -32,8 +32,16 @@ final class EditorViewModel {
     // MARK: - Persisted state (synced with VideoProject)
 
     var timelines: [Timeline] {
-        didSet { timelineRenderRevision &+= 1 }
+        didSet {
+            timelineRenderRevision &+= 1
+            let source = Analytics.origin?.source
+            if source != "agent", source != "mcp" {
+                nonAgentTimelineMutationRevision &+= 1
+            }
+            if pendingSwapClipId != nil { cancelMediaSwap() }
+        }
     }
+    @ObservationIgnored var nonAgentTimelineMutationRevision = 0
     var activeTimelineId: String
     var openTimelineIds: [String]
     @ObservationIgnored var liveViewStates: [String: TimelineViewState] = [:]
@@ -114,6 +122,7 @@ final class EditorViewModel {
     var selectedFolderIds: Set<String> = []
     var selectedTimelineIds: Set<String> = []
     var pendingSwapClipId: String?
+    @ObservationIgnored var pendingSwapTargetClipIds: [String] = []
     var clipClipboard: [ClipClipboardEntry] = []
     var zoomScale: Double = Defaults.pixelsPerFrame
     var canvasZoom: CGFloat = 1.0 {
@@ -125,6 +134,7 @@ final class EditorViewModel {
     var rotationSnapGuidesVisible: Bool = false
     var timelineVisibleWidth: Double = 0
     var timelineRenderRevision: Int = 0
+    @ObservationIgnored private var clipLocationIndexCache: (revision: Int, timelineId: String, index: [String: ClipLocation])?
     /// Live horizontal scroll of the timeline panel, mirrored from AppKit for view-state stash.
     @ObservationIgnored var timelineScrollOffsetX: Double = 0
     var timelineScrollRestoreX: Double?
@@ -144,10 +154,15 @@ final class EditorViewModel {
     var pendingEditTransitionPlacement: PendingTransitionPlacement?
     /// Clip ids currently awaiting an AI-generated replacement.
     var pendingReplacements: Set<String> = []
+    var agentActivity = AgentActivityHighlight()
+    @ObservationIgnored var agentActivityClearTask: Task<Void, Never>?
     var cropEditingActive: Bool = false
     var chromaKeySamplingClipId: String?
     /// Two-up in/out frames shown in the viewer while a slip drag is active.
     var slipPreview: SlipPreviewState?
+    var captionPreviewConfiguration: CaptionPreviewConfiguration?
+    var captionPreviewEnabled = true
+    @ObservationIgnored var captionPreviewCenterChange: ((CGPoint) -> Void)?
     var cropAspectLock: CropAspectLock = .free
     var previewTabs: [PreviewTab] = [.timeline]
     var activePreviewTabId: String = PreviewTab.timeline.id
@@ -474,7 +489,7 @@ final class EditorViewModel {
         if refreshVisuals {
             videoEngine?.refreshVisuals()
         }
-        videoEngine?.rebuild()
+        videoEngine?.rebuild(visualsCurrent: refreshVisuals)
     }
 
     /// Coalesce rapid rebuilds. An immediate `notifyTimelineChanged` cancels any pending debounced one.
@@ -588,12 +603,26 @@ final class EditorViewModel {
     }
 
     func findClip(id: String) -> ClipLocation? {
-        for ti in timeline.tracks.indices {
-            if let ci = timeline.tracks[ti].clips.firstIndex(where: { $0.id == id }) {
-                return ClipLocation(trackIndex: ti, clipIndex: ci)
+        clipLocationIndex[id]
+    }
+
+    private var clipLocationIndex: [String: ClipLocation] {
+        let current = timeline
+        if let cache = clipLocationIndexCache,
+           cache.revision == timelineRenderRevision, cache.timelineId == current.id {
+            return cache.index
+        }
+        var index: [String: ClipLocation] = [:]
+        for ti in current.tracks.indices {
+            for ci in current.tracks[ti].clips.indices {
+                let id = current.tracks[ti].clips[ci].id
+                if index[id] == nil {
+                    index[id] = ClipLocation(trackIndex: ti, clipIndex: ci)
+                }
             }
         }
-        return nil
+        clipLocationIndexCache = (timelineRenderRevision, current.id, index)
+        return index
     }
 
     func clipFor(id: String) -> Clip? {
@@ -684,6 +713,18 @@ final class EditorViewModel {
             let top = total * ay
             return Crop(left: 0, top: top, right: 0, bottom: total - top)
         }
+    }
+
+    func displayedCropAspectRatio(for clip: Clip, preferLockedRatio: Bool = true) -> CropAspectRatio? {
+        if preferLockedRatio, let ratio = cropAspectLock.aspectRatio { return ratio }
+        guard let dimensions = sourceDimensions(for: clip) else { return nil }
+        let crop = clip.cropAt(frame: activeFrame)
+        if crop.isIdentity {
+            return CropAspectRatio(pixelWidth: dimensions.width, pixelHeight: dimensions.height)
+        }
+        guard crop.visibleWidthFraction > 0, crop.visibleHeightFraction > 0 else { return nil }
+        let sourceAspect = Double(dimensions.width) / Double(dimensions.height)
+        return CropAspectRatio(pixelAspect: sourceAspect * crop.visibleWidthFraction / crop.visibleHeightFraction)
     }
 
     func removeClipInternal(id: String) {
