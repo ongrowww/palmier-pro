@@ -615,7 +615,7 @@ final class AgentService {
             return
         }
 
-        await SkillStore.shared.reloadInBackground()
+        await SkillStore.shared.reloadSkills()
         let message = messages.last { $0.role == .user }
         let visibleText = message?.blocks.compactMap {
             if case .text(let text) = $0 { return text }
@@ -645,33 +645,58 @@ final class AgentService {
                 return
             }
             sessions[liveIndex].externalThreadID = started.threadID
-            for try await event in started.events {
-                try Task.checkCancellation()
-                guard currentSessionId == sessionID else {
-                    await provider.cancel(threadID: started.threadID)
-                    return
+            let presentation = AgentStreamPresentationBuffer(model: model)
+            let snapshots = await presentation.snapshots()
+            let snapshotTask = Task { [weak self] in
+                for try await snapshot in snapshots {
+                    await self?.applyStreamSnapshot(
+                        snapshot,
+                        assistantID: assistant.id,
+                        conversationID: sessionID
+                    )
                 }
-                switch event {
-                case .reasoningSummaryDelta(let text):
-                    updateThinking(textDelta: text, toAssistant: assistant.id)
-                case .reasoningSummaryCompleted:
-                    updateThinking(signatureDelta: "codex", toAssistant: assistant.id)
-                case .textDelta(let text):
-                    appendTextDelta(text, toAssistant: assistant.id)
-                case .toolStarted(let id, let name, let inputJSON):
-                    appendToolUse(id: id, name: name, inputJSON: inputJSON, toAssistant: assistant.id)
-                case .toolCompleted(let id, let content, let isError):
-                    messages.append(AgentMessage(
-                        role: .user,
-                        blocks: [.toolResult(toolUseId: id, content: content, isError: isError)]
-                    ))
-                case .approvalRequested(let request):
-                    pendingApproval = request
-                case .approvalResolved(let id):
-                    if pendingApproval?.id == id { pendingApproval = nil }
-                case .completed:
-                    pendingApproval = nil
+            }
+
+            do {
+                for try await event in started.events {
+                    try Task.checkCancellation()
+                    guard currentSessionId == sessionID else {
+                        await provider.cancel(threadID: started.threadID)
+                        throw CancellationError()
+                    }
+                    switch event {
+                    case .reasoningSummaryDelta(let text):
+                        await presentation.receive(.thinkingDelta(text))
+                    case .reasoningSummaryCompleted:
+                        await presentation.receive(.thinkingSignature("codex"))
+                    case .textDelta(let text):
+                        await presentation.receive(.textDelta(text))
+                    case .toolStarted(let id, let name, let inputJSON):
+                        await presentation.receive(.toolUseComplete(
+                            id: id,
+                            name: name,
+                            inputJSON: inputJSON
+                        ))
+                    case .toolCompleted(let id, let content, let isError):
+                        messages.append(AgentMessage(
+                            role: .user,
+                            blocks: [.toolResult(toolUseId: id, content: content, isError: isError)]
+                        ))
+                    case .approvalRequested(let request):
+                        pendingApproval = request
+                    case .approvalResolved(let id):
+                        if pendingApproval?.id == id { pendingApproval = nil }
+                    case .completed:
+                        pendingApproval = nil
+                    }
                 }
+                await presentation.complete()
+                try await snapshotTask.value
+            } catch {
+                await presentation.complete(throwing: error)
+                snapshotTask.cancel()
+                _ = try? await snapshotTask.value
+                throw error
             }
         } catch is CancellationError {
             dropEmptyAssistantTurn(id: assistant.id)
