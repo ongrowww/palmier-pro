@@ -136,9 +136,12 @@ final class ToolExecutor {
             )
             return result
         }
+        let activeTimelineIdBefore = editor.activeTimelineId
+        let nonAgentMutationRevisionBefore = editor.nonAgentTimelineMutationRevision
         let before = editor.timelines
         let idsBefore = currentIdUniverse(editor)
         let result: ToolResult
+        var readRevision: Int?
         Log.agent.notice(
             "tool start name=\(tool.rawValue)",
             telemetry: "Agent tool started",
@@ -146,11 +149,30 @@ final class ToolExecutor {
         )
         do {
             let resolved = try expandingIdPrefixes(in: args, editor: editor)
+            readRevision = editor.beginAgentTimelineRead(
+                timelineReadActivity(for: tool, args: resolved, editor: editor)
+            )
             result = try await run(tool, editor, resolved)
         } catch let err as ToolError {
             result = .error(err.message)
         } catch {
             result = .error(error.localizedDescription)
+        }
+        if let readRevision {
+            editor.endAgentTimelineRead(readRevision, succeeded: !result.isError)
+        }
+        let timelineChanged = editor.timelines != before
+        if !result.isError,
+           timelineChanged,
+           tool.publishesTimelineChanges,
+           editor.nonAgentTimelineMutationRevision == nonAgentMutationRevisionBefore,
+           editor.activeTimelineId == activeTimelineIdBefore,
+           let previousTimeline = before.first(where: { $0.id == activeTimelineIdBefore }) {
+            publishAgentChanges(
+                before: previousTimeline,
+                after: editor.timeline,
+                editor: editor
+            )
         }
         feedbackState.record(result, for: tool)
         let elapsed = started.duration(to: .now).seconds
@@ -158,7 +180,7 @@ final class ToolExecutor {
         let payload: Telemetry.Payload = [
             "tool": tool.rawValue,
             "durationSeconds": elapsed,
-            "timelineChanged": editor.timelines != before
+            "timelineChanged": timelineChanged
         ]
         if result.isError {
             Log.agent.warning(
@@ -179,7 +201,7 @@ final class ToolExecutor {
             projectId: editor.projectId,
             result: result,
             started: started,
-            timelineChanged: editor.timelines != before
+            timelineChanged: timelineChanged
         )
         // Shorten on pre ∪ post ids: new ids and just-removed ids both stay short.
         return await shorteningIds(in: result, editor: editor, alsoKnown: idsBefore)
@@ -299,7 +321,9 @@ final class ToolExecutor {
         case .manageTracks:     return try manageTracks(editor, args)
         case .moveClips:        return try moveClips(editor, args)
         case .applyLayout:      return try applyLayout(editor, args)
+        case .swapClipMedia:    return try swapClipMedia(editor, args)
         case .setClipProperties: return try setClipProperties(editor, args)
+        case .copyClipSettings: return try copyClipSettings(editor, args)
         case .setKeyframes:     return try setKeyframes(editor, args)
         case .splitClips:       return try splitClips(editor, args)
         case .rippleDeleteRanges: return try rippleDeleteRanges(editor, args)
@@ -339,6 +363,11 @@ final class ToolExecutor {
         guard let body = SkillStore.shared.body(for: id) else {
             return .error("Unknown skill: \(id)")
         }
+        Analytics.captureSkillRead(
+            skillID: id,
+            skillSHA: SkillStore.shared.contentSHA(for: id),
+            skillOrigin: SkillStore.shared.origin(for: id).rawValue
+        )
         return .ok(body)
     }
 
@@ -360,7 +389,12 @@ final class ToolExecutor {
 
     /// Media asset, or a synthetic stand-in when `id` names a timeline (nest insertion).
     func clipSource(_ id: String, editor: EditorViewModel, path: String) throws -> MediaAsset {
-        if let existing = editor.mediaAssets.first(where: { $0.id == id }) { return existing }
+        if let existing = editor.mediaAssets.first(where: { $0.id == id }) {
+            guard existing.type != .subtitle else {
+                throw ToolError("\(path): '\(id)' is a subtitle file and can't be placed as a clip. Use add_captions with subtitleMediaRef to place its cues as captions.")
+            }
+            return existing
+        }
         guard let child = editor.timeline(for: id) else {
             throw ToolError("\(path): media asset or timeline not found: \(id)")
         }

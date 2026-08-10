@@ -1,6 +1,6 @@
 import Foundation
 
-struct WordTiming: Codable, Sendable, Equatable {
+struct WordTiming: Codable, Sendable, Equatable, Hashable {
     var text: String
     var startFrame: Int
     var endFrame: Int
@@ -31,16 +31,6 @@ struct TextAnimation: Codable, Sendable, Equatable {
 
         var isPerWord: Bool { renderMode == .perWord }
         var usesHighlight: Bool { isPerWord }
-
-        var needsIncomingCaptionCoverage: Bool {
-            switch self {
-            case .fadeIn, .popIn, .slideUp, .typewriter,
-                 .wordReveal, .wordSlide, .wordPop, .wordCycle:
-                true
-            default:
-                false
-            }
-        }
 
         var displayName: String {
             switch self {

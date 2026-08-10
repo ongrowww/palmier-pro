@@ -5,6 +5,8 @@ func unsupportedValue(model displayName: String, field: String, value: String, a
 }
 
 struct VideoModelConfig: Identifiable, Sendable {
+    static let draftResolution = "720p"
+
     @MainActor
     static var allModels: [VideoModelConfig] {
         BackendConfig.palmierCloudAvailable
@@ -19,7 +21,71 @@ struct VideoModelConfig: Identifiable, Sendable {
 
     @MainActor
     static var reframe: VideoModelConfig? {
-        allModels.first(where: { $0.id.contains("reframe") })
+        allModels.first(where: isReframeModel)
+    }
+
+    @MainActor
+    static var firstAndLastFrame: VideoModelConfig? {
+        allModels.first { !$0.requiresSourceVideo && $0.supportsFirstFrame && $0.supportsLastFrame }
+    }
+
+    static func isReframeModel(_ model: VideoModelConfig) -> Bool {
+        guard model.supportsPrompt,
+              !model.requiresSourceVideo,
+              model.maxReferenceVideos > 0 else { return false }
+        let id = model.id.lowercased()
+        return id.contains("minimax-h3") || id.contains("hailuo-03")
+    }
+
+    static func nearestSupportedDuration(seconds: Double, in durations: [Int]) -> Int {
+        durations.min { abs(Double($0) - seconds) < abs(Double($1) - seconds) }
+            ?? max(1, Int(seconds.rounded()))
+    }
+
+    func nearestSupportedDuration(for seconds: Double) -> Int {
+        Self.nearestSupportedDuration(seconds: seconds, in: durations)
+    }
+
+    /// Smallest supported duration that fully covers `seconds`, so generated
+    /// media is never shorter than the clip span it replaces.
+    func supportedDuration(covering seconds: Double) -> Int {
+        durations.filter { Double($0) >= seconds }.min()
+            ?? durations.max()
+            ?? max(1, Int(seconds.rounded(.up)))
+    }
+
+    var preferredHighResolution: String? {
+        if let resolutions, resolutions.contains("2K") { return "2K" }
+        if let resolutions, resolutions.contains("1080p") { return "1080p" }
+        return resolutions?.first
+    }
+
+    var reframeDurationLimitLabel: String? {
+        if let maximum = maxCombinedVideoRefSeconds,
+           maximum.isFinite, maximum > 0,
+           let seconds = Int(exactly: maximum.rounded()) {
+            return Self.durationLimitLabel(seconds: seconds)
+        }
+        return durations.max().map(Self.durationLimitLabel)
+    }
+
+    func validateReframeDuration(_ duration: Double) -> String? {
+        guard duration.isFinite, duration > 0 else {
+            return "Loading video metadata…"
+        }
+        let maximum = maxCombinedVideoRefSeconds
+            ?? durations.max().map(Double.init)
+        guard let maximum, duration > maximum,
+              let limit = reframeDurationLimitLabel else { return nil }
+        return "\(displayName) supports source videos up to \(limit). Trim the clip to continue."
+    }
+
+    private static func durationLimitLabel(seconds: Int) -> String {
+        if seconds.isMultiple(of: 60) {
+            let minutes = seconds / 60
+            return minutes == 1 ? "1 minute" : "\(minutes) minutes"
+        }
+        return seconds == 1 ? "1 second" : "\(seconds) seconds"
     }
 
     @MainActor
@@ -52,9 +118,18 @@ struct VideoModelConfig: Identifiable, Sendable {
     var framesAndReferencesExclusive: Bool { caps.framesAndReferencesExclusive }
     var referenceTagNoun: String { caps.referenceTagNoun }
     var requiresSourceVideo: Bool { caps.requiresSourceVideo }
+    var supportsSourceVideo: Bool { requiresSourceVideo || sourceVideoCreditsPerSecond != nil }
     var maxSourceVideoSeconds: Double? { caps.maxSourceVideoSeconds }
     var requiresReferenceImage: Bool { caps.requiresReferenceImage }
     var requiresReferenceAudio: Bool { caps.requiresReferenceAudio ?? false }
+    var supportsDraft: Bool { draftCreditsPerSecond != nil }
+    var draftCreditsPerSecond: Double? { caps.draftCreditsPerSecond }
+    var draftEnhanceCreditsPerSecond: Double? { caps.draftEnhanceCreditsPerSecond }
+    /// Extension models with selectable output durations bill on the output,
+    /// not the source clip.
+    var usesOutputDuration: Bool { supportsSourceVideo && !durations.isEmpty }
+    var sourceVideoCreditsPerSecond: [String: Double]? { caps.sourceVideoCreditsPerSecond }
+    var sourceVideoDraftCreditsPerSecond: Double? { caps.sourceVideoDraftCreditsPerSecond }
     var isEdit: Bool {
         supportsPrompt && requiresSourceVideo && !requiresReferenceImage && !requiresReferenceAudio
     }
@@ -68,11 +143,7 @@ struct VideoModelConfig: Identifiable, Sendable {
         guard let maximum = maxSourceVideoSeconds,
               maximum.isFinite, maximum > 0,
               let seconds = Int(exactly: maximum.rounded()) else { return nil }
-        if seconds.isMultiple(of: 60) {
-            let minutes = seconds / 60
-            return minutes == 1 ? "1 minute" : "\(minutes) minutes"
-        }
-        return seconds == 1 ? "1 second" : "\(seconds) seconds"
+        return Self.durationLimitLabel(seconds: seconds)
     }
 
     func validateSourceDuration(_ duration: Double) -> String? {
@@ -131,6 +202,7 @@ struct VideoGenerationParams: Encodable, Sendable {
     let referenceVideoURLs: [String]
     let referenceAudioURLs: [String]
     let generateAudio: Bool
+    let draft: Bool?
 
     init(
         prompt: String, duration: Int, aspectRatio: String, resolution: String?,
@@ -140,7 +212,8 @@ struct VideoGenerationParams: Encodable, Sendable {
         referenceImageURLs: [String] = [],
         referenceVideoURLs: [String] = [],
         referenceAudioURLs: [String] = [],
-        generateAudio: Bool = true
+        generateAudio: Bool = true,
+        draft: Bool? = nil
     ) {
         self.prompt = prompt; self.duration = duration; self.sourceVideoDuration = sourceVideoDuration
         self.aspectRatio = aspectRatio; self.resolution = resolution
@@ -150,12 +223,13 @@ struct VideoGenerationParams: Encodable, Sendable {
         self.referenceVideoURLs = referenceVideoURLs
         self.referenceAudioURLs = referenceAudioURLs
         self.generateAudio = generateAudio
+        self.draft = draft
     }
 
     enum CodingKeys: String, CodingKey {
         case kind, prompt, duration, sourceVideoDuration, aspectRatio, resolution, sourceVideoURL
         case startFrameURL, endFrameURL, referenceImageURLs, referenceVideoURLs
-        case referenceAudioURLs, generateAudio
+        case referenceAudioURLs, generateAudio, draft
     }
 
     func encode(to encoder: Encoder) throws {
@@ -173,5 +247,6 @@ struct VideoGenerationParams: Encodable, Sendable {
         if !referenceVideoURLs.isEmpty { try c.encode(referenceVideoURLs, forKey: .referenceVideoURLs) }
         if !referenceAudioURLs.isEmpty { try c.encode(referenceAudioURLs, forKey: .referenceAudioURLs) }
         try c.encode(generateAudio, forKey: .generateAudio)
+        try c.encodeIfPresent(draft, forKey: .draft)
     }
 }

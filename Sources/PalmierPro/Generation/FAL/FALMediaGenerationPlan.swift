@@ -50,7 +50,7 @@ struct FALMediaGenerationPlan: Identifiable, Sendable {
         case .video: "Generate video"
         case .audio: "Generate audio"
         case .image: "Upscale image"
-        case .text, .lottie, .sequence: "Generate media"
+        case .text, .subtitle, .lottie, .sequence: "Generate media"
         }
     }
 }

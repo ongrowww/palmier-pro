@@ -57,7 +57,7 @@ struct MediaTab: View {
 
     /// Only media types that can actually appear in the panel. ClipType.text
     /// exists for timeline clips but is never assigned to a MediaAsset.
-    private static let filterableTypes: [ClipType] = [.video, .audio, .image]
+    private static let filterableTypes: [ClipType] = [.video, .audio, .image, .subtitle]
 
     private enum ThumbnailPreset: String, CaseIterable, Identifiable {
         case small, medium, large, xlarge
@@ -281,14 +281,14 @@ struct MediaTab: View {
     // MARK: - Toolbar
 
     private var toolbar: some View {
-        VStack(spacing: AppTheme.Spacing.xs) {
+        VStack(spacing: AppTheme.Spacing.xxs) {
             actionsRow
             searchControlsRow
             contextBar
         }
         .padding(.horizontal, AppTheme.Spacing.sm)
         .padding(.top, AppTheme.Spacing.sm)
-        .padding(.bottom, AppTheme.Spacing.xs)
+        .padding(.bottom, AppTheme.Spacing.sm)
         .background(AppTheme.Background.surfaceColor)
     }
 
@@ -515,7 +515,11 @@ struct MediaTab: View {
     }
 
     func searchFilteredTimelines(_ timelines: [Timeline]) -> [Timeline] {
-        let q = searchQuery.trimmingCharacters(in: .whitespaces)
+        Self.timelinesMatchingName(timelines, query: searchQuery)
+    }
+
+    static func timelinesMatchingName(_ timelines: [Timeline], query: String) -> [Timeline] {
+        let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return timelines }
         return timelines.filter { $0.name.localizedCaseInsensitiveContains(q) }
     }
@@ -822,6 +826,7 @@ struct MediaTab: View {
         panel.message = L10n.string("Select media files or folders to import")
         var types: [UTType] = [.movie, .image, .audio, .json]
         if let lottie = UTType(filenameExtension: "lottie") { types.append(lottie) }
+        types.append(contentsOf: SubtitleFileParser.contentTypes)
         panel.allowedContentTypes = types
         panel.begin { response in
             guard response == .OK else { return }
