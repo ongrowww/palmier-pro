@@ -100,6 +100,18 @@ fileprivate struct PartialTextSpec {
     let fillMode: TextFillMode?
 }
 
+struct ParsedTextTransform {
+    let x: Double?
+    let y: Double?
+    let rotation: Double?
+    let rotationX: Double?
+    let rotationY: Double?
+
+    var hasAnyField: Bool {
+        x != nil || y != nil || rotation != nil || rotationX != nil || rotationY != nil
+    }
+}
+
 extension ToolExecutor {
     private static let addTextsAllowedKeys: Set<String> = Set([
         "trackIndex", "startFrame", "endFrame", "content",
@@ -359,60 +371,65 @@ extension ToolExecutor {
         return mode
     }
 
-    private func parseAddTextTransform(
-        _ tDict: [String: Any]?,
-        content: String, style: TextStyle,
-        canvas: (w: Double, h: Double),
-        path: String
-    ) throws -> Transform? {
-        guard let tDict else { return nil }
-        try validateUnknownKeys(tDict, allowed: ["centerX", "centerY", "width", "height", "rotation"], path: "\(path).transform")
-        let cX = try optionalNumber(tDict, key: "centerX", path: "\(path).transform")
-        let cY = try optionalNumber(tDict, key: "centerY", path: "\(path).transform")
-        let w = try optionalNumber(tDict, key: "width", path: "\(path).transform")
-        let h = try optionalNumber(tDict, key: "height", path: "\(path).transform")
-        let rotation = try optionalNumber(tDict, key: "rotation", path: "\(path).transform")
-
-        func autoFit(centerX: Double, centerY: Double) -> Transform {
-            let natural = TextLayout.naturalSize(content: content, style: style, maxWidth: CGFloat(canvas.w) * 0.9, canvasHeight: CGFloat(canvas.h))
-            return Transform(
-                centerX: centerX,
-                centerY: centerY,
-                width: Double(natural.width) / canvas.w,
-                height: Double(natural.height) / canvas.h,
-                rotation: rotation ?? 0
-            )
+    func parseTextTransform(_ raw: Any?, path: String) throws -> ParsedTextTransform? {
+        guard let raw else { return nil }
+        guard let args = raw as? [String: Any] else {
+            throw ToolError("\(path): expected object")
         }
-
-        if cX == nil && cY == nil && w == nil && h == nil {
-            guard rotation != nil else { return nil }
-            return autoFit(centerX: 0.5, centerY: 0.5)
-        }
-        guard let cx = cX, let cy = cY else {
-            throw ToolError("\(path): transform must be either {centerX, centerY} for auto-fit, or all four of {centerX, centerY, width, height}")
-        }
-        if let ww = w, let hh = h {
-            return Transform(centerX: cx, centerY: cy, width: ww, height: hh, rotation: rotation ?? 0)
-        }
-        guard w == nil && h == nil else {
-            throw ToolError("\(path): transform must be either {centerX, centerY} for auto-fit, or all four of {centerX, centerY, width, height}")
-        }
-        return autoFit(centerX: cx, centerY: cy)
-    }
-
-    private func parseUpdateTextTransform(_ tDict: [String: Any]?, path: String) throws -> ParsedTransform? {
-        guard let tDict else { return nil }
-        try validateUnknownKeys(tDict, allowed: ["centerX", "centerY", "width", "height", "rotation"], path: "\(path).transform")
-        let transform = ParsedTransform(
-            centerX: try optionalNumber(tDict, key: "centerX", path: "\(path).transform"),
-            centerY: try optionalNumber(tDict, key: "centerY", path: "\(path).transform"),
-            width: try optionalNumber(tDict, key: "width", path: "\(path).transform"),
-            height: try optionalNumber(tDict, key: "height", path: "\(path).transform"),
-            rotation: try optionalNumber(tDict, key: "rotation", path: "\(path).transform"),
-            flipHorizontal: nil,
-            flipVertical: nil
+        try validateUnknownKeys(
+            args,
+            allowed: ["x", "y", "rotation", "rotationX", "rotationY"],
+            path: path
+        )
+        let tilt = Transform.tiltRotationRange
+        let transform = ParsedTextTransform(
+            x: try optionalNumber(args, key: "x", path: path),
+            y: try optionalNumber(args, key: "y", path: path),
+            rotation: try optionalNumber(args, key: "rotation", path: path),
+            rotationX: try optionalNumber(args, key: "rotationX", path: path, range: tilt),
+            rotationY: try optionalNumber(args, key: "rotationY", path: path, range: tilt)
         )
         return transform.hasAnyField ? transform : nil
+    }
+
+    private func makeAddTextTransform(
+        _ transform: ParsedTextTransform?,
+        content: String, style: TextStyle,
+        canvas: (w: Double, h: Double)
+    ) -> Transform? {
+        guard let transform else { return nil }
+        let natural = TextLayout.naturalSize(
+            content: content,
+            style: style,
+            maxWidth: CGFloat(canvas.w) * 0.9,
+            canvasHeight: CGFloat(canvas.h)
+        )
+        let width = Double(natural.width) / canvas.w
+        return Transform(
+            centerX: transform.x.map { Self.textCenterX(anchorX: $0, width: width, alignment: style.alignment) } ?? 0.5,
+            centerY: transform.y ?? 0.5,
+            width: width,
+            height: Double(natural.height) / canvas.h,
+            rotation: transform.rotation ?? 0,
+            rotationX: transform.rotationX ?? 0,
+            rotationY: transform.rotationY ?? 0
+        )
+    }
+
+    static func textAnchorX(centerX: Double, width: Double, alignment: TextStyle.Alignment) -> Double {
+        switch alignment {
+        case .left: centerX - width / 2
+        case .center: centerX
+        case .right: centerX + width / 2
+        }
+    }
+
+    static func textCenterX(anchorX: Double, width: Double, alignment: TextStyle.Alignment) -> Double {
+        switch alignment {
+        case .left: anchorX + width / 2
+        case .center: anchorX
+        case .right: anchorX - width / 2
+        }
     }
 
     func addTexts(_ editor: EditorViewModel, _ args: [String: Any]) throws -> ToolResult {
@@ -458,11 +475,10 @@ extension ToolExecutor {
                 Self.applyTextStylePatch(patch, to: &style)
             }
 
-            let transform = try parseAddTextTransform(
-                optionalObject(entry, key: "transform", path: path),
+            let transform = makeAddTextTransform(
+                try parseTextTransform(entry["transform"], path: "\(path).transform"),
                 content: content, style: style,
-                canvas: (Double(editor.timeline.width), Double(editor.timeline.height)),
-                path: path
+                canvas: (Double(editor.timeline.width), Double(editor.timeline.height))
             )
 
             partials.append(.init(
@@ -551,10 +567,7 @@ extension ToolExecutor {
         guard !clipIds.isEmpty else { throw ToolError("Provide a non-empty 'clipIds' array or a 'captionGroupId'") }
 
         let textStylePatch = try parseTextStylePatch(args, path: "update_text")
-        let transform = try parseUpdateTextTransform(
-            optionalObject(args, key: "transform", path: "update_text"),
-            path: "update_text"
-        )
+        let transform = try parseTextTransform(args["transform"], path: "update_text.transform")
         let animation = try parseTextAnimation(preset: args.string("animation"), highlightColor: args.string("highlightColor"), path: "update_text")
         let shouldSetAnimation = args.string("animation") != nil
         let highlightOnly = shouldSetAnimation ? nil : try parseColorHex(args.string("highlightColor"), path: "update_text")
@@ -596,11 +609,17 @@ extension ToolExecutor {
         }
         let snapshot = timelineSnapshot(editor)
         let actionName = clipIds.count == 1 ? "Update Text (Agent)" : "Update Texts (Agent)"
-        let shouldFitToContent = transform?.hasLayoutField != true && (hasContent || textStylePatch?.affectsLayout == true)
+        let shouldFitToContent = hasContent || textStylePatch?.affectsLayout == true
         let canvasW = Double(editor.timeline.width)
         let canvasH = Double(editor.timeline.height)
         editor.undo.perform(actionName) {
             editor.commitClipProperties(clipIds: clipIds) { clip in
+                let originalStyle = clip.textStyle ?? TextStyle()
+                let originalAnchorX = Self.textAnchorX(
+                    centerX: clip.transform.centerX,
+                    width: clip.transform.width,
+                    alignment: originalStyle.alignment
+                )
                 if let content {
                     if clip.textContent != content {
                         clip.wordTimings = nil
@@ -612,8 +631,29 @@ extension ToolExecutor {
                     Self.applyTextStylePatch(textStylePatch, to: &style)
                     clip.textStyle = style
                 }
-                if let t = transform {
-                    t.apply(to: &clip)
+                if shouldFitToContent {
+                    _ = editor.fitTextClipToContentIfNeeded(&clip, canvasW: canvasW, canvasH: canvasH)
+                }
+                let updatedStyle = clip.textStyle ?? TextStyle()
+                if shouldFitToContent || textStylePatch?.alignment != nil || transform?.x != nil {
+                    clip.transform.centerX = Self.textCenterX(
+                        anchorX: transform?.x ?? originalAnchorX,
+                        width: clip.transform.width,
+                        alignment: updatedStyle.alignment
+                    )
+                }
+                if let y = transform?.y {
+                    clip.transform.centerY = y
+                }
+                if let rotation = transform?.rotation {
+                    clip.transform.rotation = rotation
+                    clip.rotationTrack = nil
+                }
+                if let rotationX = transform?.rotationX {
+                    clip.transform.rotationX = rotationX
+                }
+                if let rotationY = transform?.rotationY {
+                    clip.transform.rotationY = rotationY
                 }
                 if shouldSetAnimation {
                     if let animation {
@@ -634,9 +674,6 @@ extension ToolExecutor {
                 }
                 if let fillMode {
                     clip.textFillMode = fillMode == .footage ? .footage : nil
-                }
-                if shouldFitToContent {
-                    _ = editor.fitTextClipToContentIfNeeded(&clip, canvasW: canvasW, canvasH: canvasH)
                 }
             }
         }

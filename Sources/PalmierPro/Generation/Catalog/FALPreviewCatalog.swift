@@ -419,7 +419,11 @@ struct FALPreviewCatalog {
                 maxSourceVideoResolution: nil,
                 requiredSourceVideoEncoding: nil,
                 requiresReferenceImage: false,
-                requiresReferenceAudio: requiresReferenceAudio
+                requiresReferenceAudio: requiresReferenceAudio,
+                draftCreditsPerSecond: nil,
+                draftEnhanceCreditsPerSecond: nil,
+                sourceVideoCreditsPerSecond: nil,
+                sourceVideoDraftCreditsPerSecond: nil
             )),
             audioDiscountRate: audioDiscountRate
         )

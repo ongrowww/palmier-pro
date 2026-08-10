@@ -95,6 +95,8 @@ extension EditorViewModel {
         selectedGap = nil
         selectedTimelineRange = nil
         pendingSwapClipId = nil
+        pendingSwapTargetClipIds = []
+        clearAgentActivity()
         dragBefore = [:]
         preDragTimeline = nil
     }
