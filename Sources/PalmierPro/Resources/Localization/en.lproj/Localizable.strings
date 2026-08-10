@@ -180,7 +180,6 @@
 "Checked with FAL" = "Checked with FAL";
 "Checking the existing request with FAL…" = "Checking the existing request with FAL…";
 "Checking…" = "Checking…";
-"Choose Audio" = "Choose Audio";
 "Choose Codex" = "Choose Codex";
 "Choose Codex model" = "Choose Codex model";
 "Choose Codex reasoning effort" = "Choose Codex reasoning effort";
@@ -366,8 +365,8 @@
 "Enable: %@" = "Enable: %@";
 "Enhance" = "Enhance";
 "Enhance resolution or frame rate with AI" = "Enhance resolution or frame rate with AI";
-"Enter FAL API key" = "Enter FAL API key";
 "Enhanced with FLUX.3 at 1080p." = "Enhanced with FLUX.3 at 1080p.";
+"Enter FAL API key" = "Enter FAL API key";
 "Enter Full Screen" = "Enter Full Screen";
 "Estimated cost. Actual billing may differ slightly." = "Estimated cost. Actual billing may differ slightly.";
 "Exclusion" = "Exclusion";
