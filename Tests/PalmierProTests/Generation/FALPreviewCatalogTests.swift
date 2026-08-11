@@ -68,7 +68,7 @@ struct FALPreviewCatalogTests {
             "fal-ai/minimax/hailuo-2.3/standard",
             "fal-ai/minimax/hailuo-2.3/pro",
         ])
-        #expect(hailuo.allSatisfy(\.supportsFirstFrame))
+        #expect(hailuo.allSatisfy { $0.supportsFirstFrame })
         #expect(hailuo.allSatisfy { !$0.supportsLastFrame })
 
         let upcoming = FALPreviewCatalog.upcomingVideo
