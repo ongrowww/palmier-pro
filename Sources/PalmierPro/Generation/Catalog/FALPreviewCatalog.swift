@@ -1,8 +1,36 @@
 import Foundation
 
+struct FALUpcomingVideoModel: Identifiable, Sendable {
+    let id: String
+    let displayName: String
+    let providerIconKey: String
+    let availabilityLabelKey: String
+}
+
 @MainActor
 struct FALPreviewCatalog {
     static let shared = FALPreviewCatalog()
+
+    static let upcomingVideo = [
+        FALUpcomingVideoModel(
+            id: "flux-3",
+            displayName: "FLUX.3 Video",
+            providerIconKey: "blackforestlabs",
+            availabilityLabelKey: L10n.key("Waiting for fal.ai API")
+        ),
+        FALUpcomingVideoModel(
+            id: "minimax-h3",
+            displayName: "MiniMax H3",
+            providerIconKey: "minimax",
+            availabilityLabelKey: L10n.key("Waiting for fal.ai API")
+        ),
+        FALUpcomingVideoModel(
+            id: "bytedance/seedance-2.5",
+            displayName: "Seedance 2.5",
+            providerIconKey: "bytedance",
+            availabilityLabelKey: L10n.key("Announced by fal.ai · API pending")
+        ),
+    ]
 
     let video: [VideoModelConfig]
     let image: [ImageModelConfig]
@@ -140,6 +168,46 @@ struct FALPreviewCatalog {
             referenceAudios: 0,
             totalReferences: 0,
             exclusiveModes: false
+        ),
+        video(
+            id: "fal-ai/minimax/hailuo-2.3/standard",
+            name: "Hailuo 2.3 Standard",
+            vendor: "MiniMax",
+            endpoints: [
+                "fal-ai/minimax/hailuo-2.3/standard/text-to-video",
+                "fal-ai/minimax/hailuo-2.3/standard/image-to-video",
+            ],
+            durations: [6, 10],
+            resolutions: ["768p"],
+            aspectRatios: [],
+            firstFrame: true,
+            lastFrame: false,
+            referenceImages: 0,
+            referenceVideos: 0,
+            referenceAudios: 0,
+            totalReferences: 0,
+            exclusiveModes: false,
+            audioDiscountRate: nil
+        ),
+        video(
+            id: "fal-ai/minimax/hailuo-2.3/pro",
+            name: "Hailuo 2.3 Pro",
+            vendor: "MiniMax",
+            endpoints: [
+                "fal-ai/minimax/hailuo-2.3/pro/text-to-video",
+                "fal-ai/minimax/hailuo-2.3/pro/image-to-video",
+            ],
+            durations: [6],
+            resolutions: ["1080p"],
+            aspectRatios: [],
+            firstFrame: true,
+            lastFrame: false,
+            referenceImages: 0,
+            referenceVideos: 0,
+            referenceAudios: 0,
+            totalReferences: 0,
+            exclusiveModes: false,
+            audioDiscountRate: nil
         ),
         video(
             id: "fal-ai/ltx-2.3/reframe",

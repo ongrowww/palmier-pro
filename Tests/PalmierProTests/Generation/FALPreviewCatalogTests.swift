@@ -60,6 +60,27 @@ struct FALPreviewCatalogTests {
         #expect(Set(catalog.upscale.map(\.id)) == FALUpscaleGenerationPlanner.supportedModelIds)
     }
 
+    @Test func exposesConnectedHailuoAndTracksUpcomingVideoModelsSeparately() throws {
+        let catalog = FALPreviewCatalog.shared
+        let hailuo = catalog.video.filter { $0.id.contains("minimax/hailuo-2.3") }
+
+        #expect(Set(hailuo.map(\.id)) == [
+            "fal-ai/minimax/hailuo-2.3/standard",
+            "fal-ai/minimax/hailuo-2.3/pro",
+        ])
+        #expect(hailuo.allSatisfy { $0.supportsFirstFrame })
+        #expect(hailuo.allSatisfy { !$0.supportsLastFrame })
+
+        let upcoming = FALPreviewCatalog.upcomingVideo
+        #expect(Set(upcoming.map(\.id)) == [
+            "flux-3",
+            "minimax-h3",
+            "bytedance/seedance-2.5",
+        ])
+        #expect(Set(upcoming.map(\.id)).isDisjoint(with: FALVideoGenerationPlanner.supportedModelIds))
+        #expect(upcoming.allSatisfy { !$0.availabilityLabelKey.isEmpty })
+    }
+
     @Test func separatesExecutionProviderFromModelVendor() {
         let model = FALPreviewCatalog.shared.image.first {
             $0.id == "fal-ai/nano-banana-2"

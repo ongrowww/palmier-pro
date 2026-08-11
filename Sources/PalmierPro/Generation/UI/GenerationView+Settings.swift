@@ -126,6 +126,23 @@ extension GenerationView {
                         modelFamilyHeader(group)
                     }
                 }
+                if selectedProvider == .fal {
+                    Section(L10n.string(key: L10n.key("Coming to fal.ai"))) {
+                        ForEach(FALPreviewCatalog.upcomingVideo) { model in
+                            Button {} label: {
+                                Label {
+                                    Text(verbatim: "\(model.displayName) — \(L10n.string(key: model.availabilityLabelKey))")
+                                } icon: {
+                                    ProviderLogo(
+                                        iconKey: model.providerIconKey,
+                                        size: AppTheme.IconSize.xs
+                                    )
+                                }
+                            }
+                            .disabled(true)
+                        }
+                    }
+                }
             case .image:
                 ForEach(enabledImageModels, id: \.index) { item in
                     Button {

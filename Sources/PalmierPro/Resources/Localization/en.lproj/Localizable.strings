@@ -113,6 +113,7 @@
 "Angle" = "Angle";
 "Animate" = "Animate";
 "Animation" = "Animation";
+"Announced by fal.ai · API pending" = "Announced by fal.ai · API pending";
 "Anthropic API Key" = "Anthropic API Key";
 "App version %@ and macOS %@ are included." = "App version %@ and macOS %@ are included.";
 "Appearance" = "Appearance";
@@ -233,6 +234,7 @@
 "Color Dodge" = "Color Dodge";
 "Color Wheels" = "Color Wheels";
 "Color for the active word." = "Color for the active word.";
+"Coming to fal.ai" = "Coming to fal.ai";
 "Community" = "Community";
 "Community Skills Unavailable" = "Community Skills Unavailable";
 "Compatibility: %@" = "Compatibility: %@";
@@ -1062,6 +1064,7 @@
 "Voice Cleanup model not available" = "Voice Cleanup model not available";
 "Voice Cleanup requires audio or video" = "Voice Cleanup requires audio or video";
 "Volume" = "Volume";
+"Waiting for fal.ai API" = "Waiting for fal.ai API";
 "Warmth" = "Warmth";
 "Watch the tutorial or start creating." = "Watch the tutorial or start creating.";
 "We may email you for follow-up questions" = "We may email you for follow-up questions";

@@ -35,6 +35,18 @@ struct FALMediaGenerationPlanTests {
             resolution: nil,
             generateAudio: false
         ) == 700_000)
+        #expect(try FALVideoGenerationPlanner.estimatedCostMicroUSD(
+            modelId: "fal-ai/minimax/hailuo-2.3/standard",
+            duration: 10,
+            resolution: "768p",
+            generateAudio: true
+        ) == 560_000)
+        #expect(try FALVideoGenerationPlanner.estimatedCostMicroUSD(
+            modelId: "fal-ai/minimax/hailuo-2.3/pro",
+            duration: 6,
+            resolution: "1080p",
+            generateAudio: true
+        ) == 490_000)
     }
 
     @Test func pricesAudioModelsUsingTheirBillingUnits() throws {
@@ -165,6 +177,59 @@ struct FALMediaGenerationPlanTests {
         #expect(veoPlan.endpoint == "fal-ai/veo3.1/image-to-video")
         #expect(veoPlan.input["duration"] == .string("6s"))
         #expect(veoPlan.uploads.first?.target == .scalar("image_url"))
+    }
+
+    @Test @MainActor func mapsHailuoTextAndFirstFrameEndpoints() throws {
+        let frame = MediaAsset(
+            url: URL(fileURLWithPath: "/tmp/hailuo-frame.png"),
+            type: .image,
+            name: "Hailuo Frame"
+        )
+        let standard = try #require(FALPreviewCatalog.shared.video.first {
+            $0.id == "fal-ai/minimax/hailuo-2.3/standard"
+        })
+        let standardPlan = try FALVideoGenerationPlanner.makePlan(
+            generationInput: GenerationInput(
+                prompt: "A slow push toward the subject",
+                model: standard.id,
+                duration: 10,
+                aspectRatio: "",
+                resolution: "768p"
+            ),
+            model: standard,
+            inputAssets: .init(frames: [frame]),
+            generateAudio: true,
+            folderId: nil,
+            replacementClipId: nil
+        )
+        #expect(standardPlan.endpoint == "fal-ai/minimax/hailuo-2.3/standard/image-to-video")
+        #expect(standardPlan.input == [
+            "prompt": .string("A slow push toward the subject"),
+            "duration": .string("10"),
+        ])
+        #expect(standardPlan.uploads.first?.target == .scalar("image_url"))
+        #expect(standardPlan.estimatedCostMicroUSD == 560_000)
+
+        let pro = try #require(FALPreviewCatalog.shared.video.first {
+            $0.id == "fal-ai/minimax/hailuo-2.3/pro"
+        })
+        let proPlan = try FALVideoGenerationPlanner.makePlan(
+            generationInput: GenerationInput(
+                prompt: "A static cinematic portrait",
+                model: pro.id,
+                duration: 6,
+                aspectRatio: "",
+                resolution: "1080p"
+            ),
+            model: pro,
+            inputAssets: .init(),
+            generateAudio: true,
+            folderId: nil,
+            replacementClipId: nil
+        )
+        #expect(proPlan.endpoint == "fal-ai/minimax/hailuo-2.3/pro/text-to-video")
+        #expect(proPlan.input == ["prompt": .string("A static cinematic portrait")])
+        #expect(proPlan.estimatedCostMicroUSD == 490_000)
     }
 
     @Test @MainActor func mapsReframeAndLipSyncSourceWorkflows() throws {
