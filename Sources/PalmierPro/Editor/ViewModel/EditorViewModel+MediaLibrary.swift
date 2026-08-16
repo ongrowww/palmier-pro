@@ -484,6 +484,13 @@ extension EditorViewModel {
         case .center:
             cx = tl.x + currentW / 2
         }
+        if var track = clip.scaleTrack, currentW > 0, currentH > 0 {
+            for index in track.keyframes.indices {
+                track.keyframes[index].value.a *= needW / currentW
+                track.keyframes[index].value.b *= needH / currentH
+            }
+            clip.scaleTrack = track
+        }
         clip.transform.centerX = cx
         clip.transform.centerY = cy
         clip.transform.width = needW
@@ -765,7 +772,9 @@ extension EditorViewModel {
             clip.captionGroupId = spec.captionGroupId
             clip.wordTimings = spec.words
             clip.textAnimation = spec.animation
-            clip.textFillMode = spec.fillMode == .footage ? .footage : nil
+            if let fillMode = spec.fillMode {
+                clip.setTextFillMode(fillMode, footageMatteColor: spec.style.color)
+            }
             if batchTimeline != nil {
                 batchTimeline!.tracks[spec.trackIndex].clips.append(clip)
             } else {

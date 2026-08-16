@@ -11,11 +11,13 @@ struct PreviewSelectionTests {
             Fixtures.videoTrack(clips: [Fixtures.clip(id: "clip", start: 0, duration: 20)]),
         ])
         editor.selectedGap = GapSelection(trackIndex: 0, range: FrameRange(start: 50, end: 100))
+        editor.selectedTimelineMarkerIds = ["marker"]
 
         editor.selectPreviewClip("clip")
 
         #expect(editor.selectedClipIds == ["clip"])
         #expect(editor.selectedGap == nil)
+        #expect(editor.selectedTimelineMarkerIds.isEmpty)
     }
 
     @Test func selectingSelectedClipPreservesMultiSelection() {
@@ -27,10 +29,12 @@ struct PreviewSelectionTests {
             ]),
         ])
         editor.selectedClipIds = ["first", "second"]
+        editor.selectedTimelineMarkerIds = ["marker"]
 
         editor.selectPreviewClip("first")
 
         #expect(editor.selectedClipIds == ["first", "second"])
+        #expect(editor.selectedTimelineMarkerIds.isEmpty)
     }
 
     @Test func rotatedTextUsesRotatedHitTarget() {
@@ -76,5 +80,19 @@ struct PreviewSelectionTests {
             viewSize: CGSize(width: 320, height: 180),
             editor: editor
         ) == nil)
+    }
+
+    @Test func selectAdjacentPreviewTabWrapsAcrossOpenTabs() {
+        let editor = EditorViewModel()
+        #expect(editor.selectAdjacentPreviewTab(delta: 1) == false)
+        let clip = PreviewTab.mediaAsset(id: "clip", name: "Clip", type: .video)
+        editor.previewTabs = [.timeline, clip]
+        editor.activePreviewTabId = PreviewTab.timeline.id
+        #expect(editor.selectAdjacentPreviewTab(delta: 1))
+        #expect(editor.activePreviewTabId == clip.id)
+        #expect(editor.selectAdjacentPreviewTab(delta: 1))
+        #expect(editor.activePreviewTabId == PreviewTab.timeline.id)
+        #expect(editor.selectAdjacentPreviewTab(delta: -1))
+        #expect(editor.activePreviewTabId == clip.id)
     }
 }

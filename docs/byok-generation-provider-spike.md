@@ -96,9 +96,9 @@ the app.
 
 ## Thin-fork maintenance
 
-`ongrow/codex-provider` is the integration branch for the complete OnGROW
-overlay. Upstream changes are merged into this branch; the OnGROW commits are
-not replayed or copied manually for each Palmier release.
+`main` is the integration branch for the complete OnGROW overlay. Upstream
+changes are merged into this branch; the OnGROW commits are not replayed or
+copied manually for each Palmier release.
 
 `Upstream Watch` runs daily at 06:17 UTC and can also be started manually. It
 fetches `palmier-io/palmier-pro:main` and then follows one of two paths:

@@ -1023,6 +1023,7 @@ final class GenerationService {
             for placeholder in placeholders {
                 updateGenerationMetadata(placeholder, editor: editor, status: .failed(message)) { input in
                     input.backendJobId = backendJobId
+                    input.refundedCredits = job.refundedCredits
                 }
             }
             editor.onProjectCheckpointRequired?()

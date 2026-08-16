@@ -46,13 +46,27 @@ enum FrameRenderer {
 
             if case .text = layer.source, layer.clip.textFillMode == .footage {
                 let opacity = min(1.0, max(0.0, layer.clip.opacityAt(frame: frame)))
-                if opacity > 0, let matte = textStencilMatte(layer, frame: frame, renderSize: renderSize) {
+                if opacity > 0, let mask = textStencilMask(layer, frame: frame, renderSize: renderSize) {
                     let original = accum
-                    let black = CIImage(color: .black).cropped(to: accum.extent)
-                    let stenciled = accum.applyingFilter("CIBlendWithMask", parameters: [
-                        kCIInputBackgroundImageKey: black,
-                        kCIInputMaskImageKey: matte,
+                    let color = (layer.clip.textStyle ?? TextStyle()).color
+                    let matte = CIImage(color: CIColor(
+                        red: CGFloat(color.r),
+                        green: CGFloat(color.g),
+                        blue: CGFloat(color.b),
+                        alpha: CGFloat(color.a)
+                    ))
+                    .cropped(to: accum.extent)
+                    .composited(over: accum)
+                    let stencil = accum.applyingFilter("CIBlendWithMask", parameters: [
+                        kCIInputBackgroundImageKey: matte,
+                        kCIInputMaskImageKey: mask,
                     ]).cropped(to: accum.extent)
+                    let stenciled = applyTextEffects(
+                        stencil,
+                        clip: layer.clip,
+                        frame: frame,
+                        renderSize: renderSize
+                    )
                     if opacity < 1 {
                         let f = CIFilter(name: "CIDissolveTransition")
                         f?.setValue(original, forKey: kCIInputImageKey)
@@ -66,7 +80,12 @@ enum FrameRenderer {
                 continue
             }
 
-            let mode = layer.clip.blendMode ?? .normal
+            let mode: BlendMode
+            if case .text = layer.source, layer.clip.textFillMode == .inverted {
+                mode = .difference
+            } else {
+                mode = layer.clip.blendMode ?? .normal
+            }
             // Source-over bakes opacity into alpha; blend modes apply it as a fade of
             // the blend RESULT (Photoshop/Premiere semantics), so don't bake it there.
             let isNormal = mode.ciFilterName == nil
@@ -94,7 +113,7 @@ enum FrameRenderer {
         return accum
     }
 
-    private static func textStencilMatte(
+    private static func textStencilMask(
         _ layer: LayerPlan,
         frame: Int,
         renderSize: CGSize
@@ -322,21 +341,31 @@ enum FrameRenderer {
         renderSize: CGSize,
         bakeOpacity: Bool = true
     ) -> CIImage? {
-        let clip = layer.clip
+        var clip = layer.clip
         let alpha = min(1.0, max(0.0, clip.opacityAt(frame: frame)))
         guard alpha > 0 else { return nil }
+        if clip.textFillMode == .inverted {
+            var style = clip.textStyle ?? TextStyle()
+            style.color = .init(r: 1, g: 1, b: 1, a: 1)
+            style.border.enabled = false
+            style.shadow.enabled = false
+            style.background.color.a = 0
+            style.background.outlineColor.a = 0
+            clip.textStyle = style
+        }
         guard var image = TextFrameRenderer.image(clip: clip, frame: frame, renderSize: renderSize)?
             .unpremultiplyingAlpha() else { return nil }
 
-        if let effects = clip.effects, !effects.isEmpty {
-            // Effects expect the full frame; a filter may map transparent pixels to visible ones.
-            let renderRect = CGRect(origin: .zero, size: renderSize)
-            image = image.composited(over: CIImage(color: .clear).cropped(to: renderRect))
-            let offset = frame - clip.startFrame
-            for effect in effects where effect.enabled {
-                guard let descriptor = EffectRegistry.descriptor(id: effect.type) else { continue }
-                image = descriptor.render(image, effect: effect, atOffset: offset)
-            }
+        image = applyTextEffects(image, clip: clip, frame: frame, renderSize: renderSize)
+        if clip.textFillMode == .inverted {
+            let zero = CIVector(x: 0, y: 0, z: 0, w: 0)
+            image = image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": zero,
+                "inputGVector": zero,
+                "inputBVector": zero,
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
+            ])
         }
         image = transformedTextImage(image, clip: clip, frame: frame, renderSize: renderSize)
         image = image.premultiplyingAlpha()
@@ -345,6 +374,43 @@ enum FrameRenderer {
             image = image.applyingFilter("CIColorMatrix", parameters: [
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: alpha),
             ])
+        }
+        return image
+    }
+
+    static func applyTextEffects(
+        _ input: CIImage,
+        clip: Clip,
+        frame: Int,
+        renderSize: CGSize
+    ) -> CIImage {
+        let blurRadius = clip.blurRadius(at: frame)
+        let effects = (clip.effects ?? []).filter { $0.type != Effect.gaussianBlurType }
+        guard blurRadius > 0 || !effects.isEmpty else { return input }
+        let renderRect = CGRect(origin: .zero, size: renderSize)
+        var image = input.composited(over: CIImage(color: .clear).cropped(to: renderRect))
+        let offset = frame - clip.startFrame
+        let spatialScale = Double(renderSize.height / TextLayout.referenceCanvasHeight)
+        if blurRadius.isFinite,
+           let descriptor = EffectRegistry.descriptor(id: Effect.gaussianBlurType) {
+            image = descriptor.render(
+                image,
+                effect: Effect.make(
+                    Effect.gaussianBlurType,
+                    [Effect.gaussianBlurRadiusKey: blurRadius]
+                ),
+                atOffset: offset,
+                spatialScale: spatialScale
+            )
+        }
+        for effect in effects where effect.enabled {
+            guard let descriptor = EffectRegistry.descriptor(id: effect.type) else { continue }
+            image = descriptor.render(
+                image,
+                effect: effect,
+                atOffset: offset,
+                spatialScale: spatialScale
+            )
         }
         return image
     }

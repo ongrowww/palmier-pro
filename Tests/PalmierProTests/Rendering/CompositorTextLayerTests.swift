@@ -56,6 +56,20 @@ struct CompositorTextLayerTests {
         return n
     }
 
+    private func visibleBounds(_ frame: CompositorRenderTests.Frame) -> CGRect? {
+        let height = frame.bytes.count / (frame.w * 4)
+        var bounds = CGRect.null
+        for y in 0..<height {
+            for x in 0..<frame.w {
+                let pixel = frame.at(x, y)
+                if pixel.r + pixel.g + pixel.b > 30 {
+                    bounds = bounds.union(CGRect(x: x, y: y, width: 1, height: 1))
+                }
+            }
+        }
+        return bounds.isNull ? nil : bounds
+    }
+
     @Test func textCompositesOverVideo() async throws {
         let tl = CompositorRenderTests.timelineWith(
             Fixtures.videoTrack(clips: [textClip("HELLO")]),                       // track 0: top
@@ -63,6 +77,134 @@ struct CompositorTextLayerTests {
         )
         let f = try await CompositorRenderTests.render(tl, frame: 15, renderSize: Self.size)
         #expect(whiteInBand(f) > 30, "white text should composite over the video: \(whiteInBand(f))")
+    }
+
+    @Test func gaussianBlurSoftensTheCompleteTextLayer() async throws {
+        let sharp = backgroundTextClip()
+        var blurred = sharp
+        blurred.textStyle?.blur = 60
+        let sharpFrame = try await CompositorRenderTests.render(
+            CompositorRenderTests.timelineWith(Fixtures.videoTrack(clips: [sharp])),
+            frame: 15,
+            renderSize: Self.size
+        )
+        let blurredFrame = try await CompositorRenderTests.render(
+            CompositorRenderTests.timelineWith(Fixtures.videoTrack(clips: [blurred])),
+            frame: 15,
+            renderSize: Self.size
+        )
+        let sharpOutside = sharpFrame.at(60, 90)
+        let blurredOutside = blurredFrame.at(60, 90)
+
+        #expect(CompositorFixtures.isBlack(sharpOutside))
+        #expect(blurredOutside.r + blurredOutside.g + blurredOutside.b > 30)
+        #expect(blurredFrame.at(64, 90).r < sharpFrame.at(64, 90).r)
+    }
+
+    @Test func gaussianBlurKeyframesAnimateTheCompleteTextLayer() async throws {
+        var animated = backgroundTextClip()
+        animated.setBlurKeyframeTrack(KeyframeTrack(keyframes: [
+            Keyframe(frame: 0, value: 0, interpolationOut: .linear),
+            Keyframe(frame: 30, value: 60, interpolationOut: .linear),
+        ]))
+        let timeline = CompositorRenderTests.timelineWith(Fixtures.videoTrack(clips: [animated]))
+        let sharpFrame = try await CompositorRenderTests.render(timeline, frame: 0, renderSize: Self.size)
+        let blurredFrame = try await CompositorRenderTests.render(timeline, frame: 30, renderSize: Self.size)
+
+        #expect(CompositorFixtures.isBlack(sharpFrame.at(60, 90)))
+        let blurredOutside = blurredFrame.at(60, 90)
+        #expect(blurredOutside.r + blurredOutside.g + blurredOutside.b > 30)
+    }
+
+    @Test func genericGaussianEffectDoesNotCreateASecondTextBlurSource() async throws {
+        let sharp = backgroundTextClip()
+        var effectBlurred = sharp
+        effectBlurred.effects = [Effect.make("blur.gaussian", ["radius": 60])]
+        let sharpFrame = try await CompositorRenderTests.render(
+            CompositorRenderTests.timelineWith(Fixtures.videoTrack(clips: [sharp])),
+            frame: 15,
+            renderSize: Self.size
+        )
+        let effectFrame = try await CompositorRenderTests.render(
+            CompositorRenderTests.timelineWith(Fixtures.videoTrack(clips: [effectBlurred])),
+            frame: 15,
+            renderSize: Self.size
+        )
+
+        #expect(effectFrame.bytes == sharpFrame.bytes)
+    }
+
+    @Test func invertedFillUsesWhiteDifferenceBlend() async throws {
+        var text = textClip("HELLO")
+        text.textFillMode = .inverted
+        var style = text.textStyle ?? TextStyle()
+        style.color = .init(r: 0.2, g: 0.4, b: 0.6, a: 1)
+        style.fontScale = 4
+        style.isBold = true
+        style.border.enabled = true
+        style.shadow.enabled = true
+        style.background.enabled = true
+        text.textStyle = style
+        text.transform = Transform(topLeft: (0.05, 0.25), width: 0.9, height: 0.5)
+
+        let background = CompositorRenderTests.timelineWith(
+            Fixtures.videoTrack(clips: [CompositorFixtures.patternClip(id: "bg")])
+        )
+        let composited = CompositorRenderTests.timelineWith(
+            Fixtures.videoTrack(clips: [text]),
+            Fixtures.videoTrack(clips: [CompositorFixtures.patternClip(id: "bg")])
+        )
+        let original = try await CompositorRenderTests.render(background, frame: 15, renderSize: Self.size)
+        let inverted = try await CompositorRenderTests.render(composited, frame: 15, renderSize: Self.size)
+        var invertedPixels = 0
+        for y in 0..<Int(Self.size.height) {
+            for x in 0..<Int(Self.size.width) {
+                let source = original.at(x, y)
+                let result = inverted.at(x, y)
+                let matchesInverse = abs(result.r - (255 - source.r)) < 30
+                    && abs(result.g - (255 - source.g)) < 30
+                    && abs(result.b - (255 - source.b)) < 30
+                if matchesInverse { invertedPixels += 1 }
+            }
+        }
+
+        #expect(invertedPixels > 100)
+        #expect(inverted.tl == original.tl)
+        #expect(inverted.tr == original.tr)
+    }
+
+    @Test func invertedFillPreservesBackgroundPaddingLayout() async throws {
+        var normal = textClip("HELLO")
+        var style = normal.textStyle ?? TextStyle()
+        style.alignment = .left
+        style.background = .init(
+            enabled: true,
+            color: .init(r: 0, g: 0, b: 0, a: 0),
+            paddingX: 80,
+            paddingY: 30
+        )
+        normal.textStyle = style
+        normal.transform = Transform(topLeft: (0.05, 0.25), width: 0.9, height: 0.5)
+        var inverted = normal
+        inverted.textFillMode = .inverted
+
+        let normalFrame = try await CompositorRenderTests.render(
+            CompositorRenderTests.timelineWith(Fixtures.videoTrack(clips: [normal])),
+            frame: 15,
+            renderSize: Self.size
+        )
+        let invertedFrame = try await CompositorRenderTests.render(
+            CompositorRenderTests.timelineWith(Fixtures.videoTrack(clips: [inverted])),
+            frame: 15,
+            renderSize: Self.size
+        )
+
+        let normalBounds = try #require(visibleBounds(normalFrame))
+        let invertedBounds = try #require(visibleBounds(invertedFrame))
+        #expect(abs(invertedBounds.minX - normalBounds.minX) <= 1)
+        #expect(abs(invertedBounds.minY - normalBounds.minY) <= 1)
+        #expect(abs(invertedBounds.width - normalBounds.width) <= 1)
+        #expect(abs(invertedBounds.height - normalBounds.height) <= 1)
     }
 
     @Test func textObeysTrackZOrder() async throws {
@@ -207,7 +349,7 @@ struct CompositorTextLayerTests {
 
     @Test func footageFillUsesTextRotation() async throws {
         var text = backgroundTextClip(rotation: 90)
-        text.textFillMode = .footage
+        text.setTextFillMode(.footage)
         let timeline = CompositorRenderTests.timelineWith(
             Fixtures.videoTrack(clips: [text]),
             Fixtures.videoTrack(clips: [CompositorFixtures.patternClip(id: "bg")])
@@ -220,7 +362,7 @@ struct CompositorTextLayerTests {
 
     @Test func footageFillUsesTextTiltRotation() async throws {
         var text = backgroundTextClip(rotationY: 60)
-        text.textFillMode = .footage
+        text.setTextFillMode(.footage)
         let timeline = CompositorRenderTests.timelineWith(
             Fixtures.videoTrack(clips: [text]),
             Fixtures.videoTrack(clips: [CompositorFixtures.patternClip(id: "bg")])
@@ -243,6 +385,16 @@ struct CompositorTextLayerTests {
         #expect(patternPixels > 80, "footage should show through glyphs: \(patternPixels)")
     }
 
+    @Test func footageFillUsesTextColorForTheMatte() async throws {
+        let frame = try await renderFootageFill(
+            opacity: 1,
+            matteColor: .init(r: 0, g: 1, b: 0, a: 1)
+        )
+
+        #expect(CompositorFixtures.isGreen(frame.tl), "outside glyphs should use the text color: \(frame.tl)")
+        #expect(patternPixelsInTextBand(frame) > 80)
+    }
+
     @Test func footageFillOpacityCrossfadesStencil() async throws {
         let opaque = try await renderFootageFill(opacity: 1)
         let mid = try await renderFootageFill(opacity: 0.5)
@@ -255,14 +407,18 @@ struct CompositorTextLayerTests {
                 "corner red should sit between stenciled and full: \(mid.tl) vs \(opaque.tl)/\(clear.tl)")
     }
 
-    private func renderFootageFill(opacity: Double) async throws -> CompositorRenderTests.Frame {
+    private func renderFootageFill(
+        opacity: Double,
+        matteColor: TextStyle.RGBA = .init(r: 0, g: 0, b: 0, a: 1)
+    ) async throws -> CompositorRenderTests.Frame {
         var text = textClip("HELLO")
-        text.textFillMode = .footage
         text.opacity = opacity
         var style = text.textStyle ?? TextStyle()
         style.fontScale = 4
         style.isBold = true
+        style.color = matteColor
         text.textStyle = style
+        text.setTextFillMode(.footage, footageMatteColor: matteColor)
         text.transform = Transform(topLeft: (0.05, 0.25), width: 0.9, height: 0.5)
 
         let tl = CompositorRenderTests.timelineWith(

@@ -457,7 +457,7 @@ class VideoProject: NSDocument {
         let editorView = EditorView()
             .environment(editorViewModel)
             .focusEffectDisabled()
-            .background(.ultraThickMaterial)
+            .background(.ultraThinMaterial)
             .sheet(isPresented: Bindable(editorViewModel).showExportDialog) { [editorViewModel] in
                 ExportView()
                     .environment(editorViewModel)
@@ -470,14 +470,16 @@ class VideoProject: NSDocument {
                 TourOverlay()
                     .environment(editorViewModel)
             }
+            .ignoresSafeArea(.container, edges: .top)
         let hostingController = NSHostingController(rootView: editorView.appLocalization().tint(AppTheme.Accent.primary))
         hostingController.sizingOptions = .minSize
+        hostingController.safeAreaRegions = []
 
         let window = NSWindow(contentViewController: hostingController)
         window.minSize = AppTheme.Window.projectMin
         window.titleVisibility = .visible
         window.titlebarAppearsTransparent = true
-        window.backgroundColor = AppTheme.Background.base.withAlphaComponent(CGFloat(AppTheme.Opacity.medium))
+        window.backgroundColor = AppTheme.Background.base.withAlphaComponent(AppTheme.Opacity.high)
         window.isOpaque = false
         window.styleMask.insert(.fullSizeContentView)
         window.fillVisibleScreen()
@@ -488,15 +490,13 @@ class VideoProject: NSDocument {
         let controller = EditorWindowController(editorViewModel: editorViewModel, window: window)
         controller.onBecameKey = { [weak self] in
             guard let self else { return }
-            AppState.shared.activateProject(self)
+            AppState.shared.projectWindowDidBecomeKey(self)
         }
         window.delegate = controller
         controller.installKeyMonitor()
         addWindowController(controller)
 
         window.standardWindowButton(.documentIconButton)?.isHidden = true
-
-        AppState.shared.showEditor(for: self)
 
         editorViewModel.searchIndex.projectOpened()
         editorViewModel.updateTelemetryContext()

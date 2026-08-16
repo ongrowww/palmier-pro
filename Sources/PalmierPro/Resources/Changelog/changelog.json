@@ -2,14 +2,15 @@
   "changelogURL": "https://github.com/palmier-io/palmier-pro/releases",
   "entries": [
     {
-      "version": "0.7.2",
-      "date": "2026-08-05",
+      "version": "0.7.5",
+      "date": "2026-08-14",
       "sections": [
         {
           "heading": "New",
           "items": [
-            "New Video Models: Minimax H3 and Flux 3 are available on Palmier Pro. Flux 3 supports draft mode which is a faster and cheaper way to iterate",
-            "Agent can now swap media in your timeline"
+            "New keyframe UI: Keyframe edit has moved to the timeline editor! Expand the keyframe editor from the track header, and start editing keyframes directly below the clips.",
+            "Timeline markers: You can now leave markers and comments and agent will see them automatically. Use M to add one at playhead, option+drag to split the marker to a range.",
+            "Blur and text keyframes: We have more keyframe controls on videos and text."
           ]
         }
       ]
