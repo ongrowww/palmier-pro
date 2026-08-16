@@ -82,6 +82,7 @@ struct GenerationInput: Codable, Sendable, Equatable {
     var backendJobId: String?
     var outputIndex: Int?
     var resultURLs: [String]?
+    var refundedCredits: Int?
 }
 
 enum MediaSource: Codable, Sendable, Equatable {

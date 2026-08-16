@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TARGET_BRANCH: ongrow/codex-provider
+  TARGET_BRANCH: main
   UPSTREAM_REPOSITORY: palmier-io/palmier-pro
   UPSTREAM_BRANCH: main
   UPSTREAM_ASSIGNEE: Schrobo

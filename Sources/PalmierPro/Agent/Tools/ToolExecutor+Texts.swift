@@ -70,6 +70,7 @@ struct ParsedTextStylePatch {
     let outline: ParsedTextOutlinePatch?
     let shadow: ParsedTextShadowPatch?
     let background: ParsedTextBackgroundPatch?
+    let blur: Double?
 
     var hasAnyField: Bool {
         fontName != nil || fontSize != nil || widthScale != nil || heightScale != nil
@@ -77,7 +78,7 @@ struct ParsedTextStylePatch {
             || isUnderlined != nil || isStruckThrough != nil || isOverlined != nil
             || tracking != nil || lineSpacing != nil || fontCase != nil
             || color != nil || alignment != nil || outline?.hasAnyField == true
-            || shadow?.hasAnyField == true || background?.hasAnyField == true
+            || shadow?.hasAnyField == true || background?.hasAnyField == true || blur != nil
     }
 
     var affectsLayout: Bool {
@@ -138,7 +139,7 @@ extension ToolExecutor {
                 "fontName", "fontSize", "widthScale", "heightScale",
                 "bold", "italic", "underline", "strikethrough", "overline",
                 "tracking", "lineSpacing", "fontCase",
-                "color", "alignment", "outline", "shadow", "background",
+                "color", "alignment", "outline", "shadow", "background", "blur",
             ],
             path: path
         )
@@ -164,7 +165,8 @@ extension ToolExecutor {
             alignment: try parseTextAlignment(args, path: path),
             outline: outline,
             shadow: shadow,
-            background: background
+            background: background,
+            blur: try optionalNumber(args, key: "blur", path: path, range: 0...100)
         )
     }
 
@@ -321,6 +323,7 @@ extension ToolExecutor {
         if let f = patch.fontCase { style.fontCase = f }
         if let c = patch.color { style.color = c }
         if let a = patch.alignment { style.alignment = a }
+        if let b = patch.blur { style.blur = b }
         if let outline = patch.outline {
             if let e = outline.enabled { style.border.enabled = e }
             if let c = outline.color { style.border.color = c }
@@ -366,7 +369,9 @@ extension ToolExecutor {
     private func parseTextFillMode(_ raw: String?, path: String) throws -> TextFillMode? {
         guard let raw else { return nil }
         guard let mode = TextFillMode(rawValue: raw) else {
-            throw ToolError("\(path).fillMode: expected color or footage")
+            throw ToolError(
+                "\(path).fillMode: expected \(TextFillMode.allCases.map(\.rawValue).joined(separator: ", "))"
+            )
         }
         return mode
     }
@@ -470,9 +475,14 @@ extension ToolExecutor {
             }
             let durationFrames = endFrame - startFrame
 
+            let stylePatch = try parseTextStylePatch(entry, path: path)
+            let fillMode = try parseTextFillMode(entry.string("fillMode"), path: path)
             var style = TextStyle()
-            if let patch = try parseTextStylePatch(entry, path: path) {
-                Self.applyTextStylePatch(patch, to: &style)
+            if let stylePatch {
+                Self.applyTextStylePatch(stylePatch, to: &style)
+            }
+            if fillMode == .footage, stylePatch?.color == nil {
+                style.color = TextFillMode.defaultFootageMatteColor
             }
 
             let transform = makeAddTextTransform(
@@ -489,7 +499,7 @@ extension ToolExecutor {
                 style: style,
                 transform: transform,
                 animation: try parseTextAnimation(preset: entry.string("animation"), highlightColor: entry.string("highlightColor"), path: path),
-                fillMode: try parseTextFillMode(entry.string("fillMode"), path: path)
+                fillMode: fillMode
             ))
         }
 
@@ -602,6 +612,12 @@ extension ToolExecutor {
                 notes.append("Static rotation cleared existing rotation keyframes on: \(cleared.joined(separator: ", ")).")
             }
         }
+        if textStylePatch?.blur != nil {
+            let cleared = clipIds.filter { editor.clipFor(id: $0)?.blurKeyframeTrack != nil }
+            if !cleared.isEmpty {
+                notes.append("Static blur cleared existing blur keyframes on: \(cleared.joined(separator: ", ")).")
+            }
+        }
 
         var beforeClips: [String: Clip] = [:]
         for id in clipIds {
@@ -630,6 +646,9 @@ extension ToolExecutor {
                     var style = clip.textStyle ?? TextStyle()
                     Self.applyTextStylePatch(textStylePatch, to: &style)
                     clip.textStyle = style
+                    if textStylePatch.blur != nil {
+                        clip.setBlurKeyframeTrack(nil)
+                    }
                 }
                 if shouldFitToContent {
                     _ = editor.fitTextClipToContentIfNeeded(&clip, canvasW: canvasW, canvasH: canvasH)
@@ -673,7 +692,7 @@ extension ToolExecutor {
                     clip.textAnimation = a
                 }
                 if let fillMode {
-                    clip.textFillMode = fillMode == .footage ? .footage : nil
+                    clip.setTextFillMode(fillMode, footageMatteColor: textStylePatch?.color)
                 }
             }
         }
