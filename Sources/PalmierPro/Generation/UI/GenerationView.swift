@@ -193,7 +193,6 @@ struct GenerationView: View {
         .frame(maxWidth: .infinity)
         .frame(height: AppTheme.GenerationPanel.loadingHeight)
         .background { panelChrome }
-        .padding(.horizontal, AppTheme.Spacing.sm)
     }
 
     private var bodyContent: some View {
@@ -218,7 +217,7 @@ struct GenerationView: View {
             }
             .padding(.horizontal, AppTheme.Spacing.md)
 
-            VStack(spacing: AppTheme.Spacing.xs) {
+            VStack(spacing: AppTheme.Spacing.sm) {
                 referencesContent
                     .layoutPriority(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -252,12 +251,12 @@ struct GenerationView: View {
                     inputToolbar
                 }
                 .background {
-                    RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppTheme.Radius.lg, style: .continuous)
                         .fill(AppTheme.Background.prominentColor)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.lg, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous)
+                    RoundedRectangle(cornerRadius: AppTheme.Radius.lg, style: .continuous)
                         .strokeBorder(
                             isPromptFocused
                                 ? AppTheme.Accent.primary.opacity(AppTheme.Opacity.medium)
@@ -272,10 +271,9 @@ struct GenerationView: View {
             .padding(.bottom, AppTheme.Spacing.md)
         }
         .padding(.top, AppTheme.Spacing.md)
-        .overlay(alignment: .top) { resizeHandle }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measuredPanelHeight = $0 }
         .background { panelChrome }
-        .padding(.horizontal, AppTheme.Spacing.sm)
+        .overlay(alignment: .top) { resizeHandle }
         .onAppear {
             falCredentials.refresh()
             let hadSeed = editor.pendingPanelSeed != nil
@@ -370,13 +368,13 @@ struct GenerationView: View {
     }
 
     private var panelChrome: some View {
-        RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous)
-            .fill(AppTheme.Background.raisedColor)
+        AppTheme.Background.surfaceColor
             .shadow(AppTheme.Shadow.overlay)
             .shadow(AppTheme.Shadow.lg)
-            .overlay {
-                RoundedRectangle(cornerRadius: AppTheme.Radius.xl, style: .continuous)
-                    .strokeBorder(AppTheme.Border.subtleColor, lineWidth: AppTheme.BorderWidth.thin)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(AppTheme.Border.primaryColor)
+                    .frame(height: AppTheme.BorderWidth.thin)
             }
             .allowsHitTesting(false)
     }
@@ -384,12 +382,12 @@ struct GenerationView: View {
     // MARK: - Resize handle
 
     private var resizeHandle: some View {
-        Capsule()
-            .fill(AppTheme.Interaction.fill(AppTheme.Opacity.soft))
-            .frame(width: 24, height: 2)
-            .frame(maxWidth: .infinity, minHeight: AppTheme.Spacing.md)
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: AppTheme.Spacing.md)
             .contentShape(Rectangle())
             .pointerStyle(.rowResize)
+            .offset(y: -AppTheme.Spacing.md / 2)
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in

@@ -16,19 +16,19 @@ struct FALPreviewCatalog {
             id: "flux-3",
             displayName: "FLUX.3 Video",
             providerIconKey: "blackforestlabs",
-            availabilityLabelKey: L10n.key("Waiting for fal.ai API")
+            availabilityLabelKey: L10n.key("Not connected in this build")
         ),
         FALUpcomingVideoModel(
             id: "minimax-h3",
             displayName: "MiniMax H3",
             providerIconKey: "minimax",
-            availabilityLabelKey: L10n.key("Waiting for fal.ai API")
+            availabilityLabelKey: L10n.key("Not connected in this build")
         ),
         FALUpcomingVideoModel(
             id: "bytedance/seedance-2.5",
             displayName: "Seedance 2.5",
             providerIconKey: "bytedance",
-            availabilityLabelKey: L10n.key("Announced by fal.ai · API pending")
+            availabilityLabelKey: L10n.key("Not connected in this build")
         ),
     ]
 

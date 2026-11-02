@@ -71,6 +71,7 @@
 "Add Marker (M)" = "Add Marker (M)";
 "Add Range to Chat" = "Add Range to Chat";
 "Add Text" = "Add Text";
+"Add a comment" = "Add a comment";
 "Add a fal.ai API key in Settings." = "Add a fal.ai API key in Settings.";
 "Add an Anthropic API key or credits to use this model." = "Add an Anthropic API key or credits to use this model.";
 "Add an OpenAI API key or credits to use this model." = "Add an OpenAI API key or credits to use this model.";
@@ -103,6 +104,7 @@
 "Agentic editing" = "Agentic editing";
 "Alignment" = "Alignment";
 "All" = "All";
+"All Statuses" = "All Statuses";
 "All fonts" = "All fonts";
 "Allow for session" = "Allow for session";
 "Allow matching requests for this Codex session" = "Allow matching requests for this Codex session";
@@ -113,7 +115,6 @@
 "Angle" = "Angle";
 "Animate" = "Animate";
 "Animation" = "Animation";
-"Announced by fal.ai · API pending" = "Announced by fal.ai · API pending";
 "Anthropic API Key" = "Anthropic API Key";
 "App version %@ and macOS %@ are included." = "App version %@ and macOS %@ are included.";
 "Appearance" = "Appearance";
@@ -166,6 +167,7 @@
 "Cap characters per caption, including spaces and punctuation. A single word may exceed the limit." = "Cap characters per caption, including spaces and punctuation. A single word may exceed the limit.";
 "Cap the words shown per caption. None fits each line to the box." = "Cap the words shown per caption. None fits each line to the box.";
 "CapCut" = "CapCut";
+"Caption %@" = "Caption %@";
 "Captions" = "Captions";
 "Captions will look like this" = "Captions will look like this";
 "Capture Frame to Media" = "Capture Frame to Media";
@@ -238,7 +240,7 @@
 "Color Dodge" = "Color Dodge";
 "Color Wheels" = "Color Wheels";
 "Color for the active word." = "Color for the active word.";
-"Coming to fal.ai" = "Coming to fal.ai";
+"Comments" = "Comments";
 "Community" = "Community";
 "Community Skills Unavailable" = "Community Skills Unavailable";
 "Compatibility: %@" = "Compatibility: %@";
@@ -296,6 +298,7 @@
 "Delete" = "Delete";
 "Delete %lld" = "Delete %lld";
 "Delete Keyframe" = "Delete Keyframe";
+"Delete Marker" = "Delete Marker";
 "Delete Project" = "Delete Project";
 "Delete Project?" = "Delete Project?";
 "Delete Selected Projects?" = "Delete Selected Projects?";
@@ -396,6 +399,7 @@
 "Extend" = "Extend";
 "Extends captions across short gaps and holds the final caption." = "Extends captions across short gaps and holds the final caption.";
 "Extra Large" = "Extra Large";
+"Extract Audio" = "Extract Audio";
 "FAL integration preview" = "FAL integration preview";
 "FLUX Enhance" = "FLUX Enhance";
 "Fade In" = "Fade In";
@@ -412,6 +416,7 @@
 "Fill prompt" = "Fill prompt";
 "Film Grain" = "Film Grain";
 "Filmmaker" = "Filmmaker";
+"Filter markers by status" = "Filter markers by status";
 "Final Cut Pro" = "Final Cut Pro";
 "First Frame" = "First Frame";
 "First-time sign-ups only" = "First-time sign-ups only";
@@ -534,6 +539,7 @@
 "Invert Colors" = "Invert Colors";
 "Inverted" = "Inverted";
 "Italic" = "Italic";
+"Jump to Playhead" = "Jump to Playhead";
 "Keep Current" = "Keep Current";
 "Keep Editing" = "Keep Editing";
 "Keep Skill" = "Keep Skill";
@@ -601,6 +607,7 @@
 "Mark Speakers" = "Mark Speakers";
 "Marker %lld" = "Marker %lld";
 "Marker name" = "Marker name";
+"Markers" = "Markers";
 "Marketer" = "Marketer";
 "Master Audio Meter" = "Master Audio Meter";
 "Master — defines the group's clock and transcript." = "Master — defines the group's clock and transcript.";
@@ -668,6 +675,8 @@
 "No exports yet" = "No exports yet";
 "No generations yet" = "No generations yet";
 "No images" = "No images";
+"No markers" = "No markers";
+"No markers match this filter." = "No markers match this filter.";
 "No matches" = "No matches";
 "No matches for \"%@\"" = "No matches for \"%@\"";
 "No matches for “%@”" = "No matches for “%@”";
@@ -684,9 +693,10 @@
 "Noise Reduction" = "Noise Reduction";
 "None" = "None";
 "Normal" = "Normal";
+"Not connected" = "Not connected";
+"Not connected in this build" = "Not connected in this build";
 "Not selected" = "Not selected";
 "Not synced — unusable as an angle." = "Not synced — unusable as an angle.";
-"Notes" = "Notes";
 "Notifications" = "Notifications";
 "OK" = "OK";
 "Off" = "Off";
@@ -749,6 +759,7 @@
 "Preparing" = "Preparing";
 "Preparing…" = "Preparing…";
 "Presence" = "Presence";
+"Press M in the timeline to add a marker." = "Press M in the timeline to add a marker.";
 "Preview" = "Preview";
 "Privacy & Diagnostics" = "Privacy & Diagnostics";
 "Pro plan" = "Pro plan";
@@ -820,16 +831,19 @@
 "Resolution" = "Resolution";
 "Resolution must be at least 2 × 2 pixels." = "Resolution must be at least 2 × 2 pixels.";
 "Resolution must not exceed 8192 pixels on either edge." = "Resolution must not exceed 8192 pixels on either edge.";
+"Resolved" = "Resolved";
 "Restart Palmier Pro" = "Restart Palmier Pro";
 "Restart Palmier Pro to apply this change." = "Restart Palmier Pro to apply this change.";
 "Retry" = "Retry";
 "Retry Download" = "Retry Download";
 "Reveal in Finder" = "Reveal in Finder";
+"Review" = "Review";
 "Review estimated fal.ai cost and generate." = "Review estimated fal.ai cost and generate.";
 "Right" = "Right";
 "Ripple Delete" = "Ripple Delete";
 "Ripple Delete Gap" = "Ripple Delete Gap";
 "Ripple Insert" = "Ripple Insert";
+"Ripple Timeline Markers" = "Ripple Timeline Markers";
 "Ripple Trim" = "Ripple Trim";
 "Ripple-deletes every silent section; downstream clips close the gaps." = "Ripple-deletes every silent section; downstream clips close the gaps.";
 "Rotation" = "Rotation";
@@ -848,6 +862,7 @@
 "Save As…" = "Save As…";
 "Save Changes" = "Save Changes";
 "Save Range as Media" = "Save Range as Media";
+"Save as Audio" = "Save as Audio";
 "Save as Media" = "Save as Media";
 "Save this project to view activity" = "Save this project to view activity";
 "Saves a copy of this project with all media bundled inside, so it opens on any machine." = "Saves a copy of this project with all media bundled inside, so it opens on any machine.";
@@ -952,6 +967,8 @@
 "Start creating" = "Start creating";
 "Start creating, or explore these to get the most out of Palmier Pro." = "Start creating, or explore these to get the most out of Palmier Pro.";
 "Starts %@s into the group's clock; matched the master with %@%% confidence." = "Starts %@s into the group's clock; matched the master with %@%% confidence.";
+"Status Filter" = "Status Filter";
+"Status: %@" = "Status: %@";
 "Step %lld of %lld" = "Step %lld of %lld";
 "Step Backward" = "Step Backward";
 "Step Forward" = "Step Forward";
@@ -997,6 +1014,7 @@
 "Thanks for the feedback." = "Thanks for the feedback.";
 "The clip you're adding has different settings than the current project." = "The clip you're adding has different settings than the current project.";
 "The export" = "The export";
+"The marker comment changed while you were editing. Review it and try again." = "The marker comment changed while you were editing. Review it and try again.";
 "The project will be moved to the Trash." = "The project will be moved to the Trash.";
 "The selected model refused this request. Revise the prompt and try again." = "The selected model refused this request. Revise the prompt and try again.";
 "The selected projects will be moved to the Trash." = "The selected projects will be moved to the Trash.";
@@ -1028,7 +1046,11 @@
 "Top / Bottom" = "Top / Bottom";
 "Track Name" = "Track Name";
 "Tracking" = "Tracking";
+"Transcribe" = "Transcribe";
+"Transcribe · %lld credits" = "Transcribe · %lld credits";
+"Transcribe · 1 credit" = "Transcribe · 1 credit";
 "Transcribing…" = "Transcribing…";
+"Transcript" = "Transcript";
 "Transcription failed: %@" = "Transcription failed: %@";
 "Transform" = "Transform";
 "Transform with a prompt or motion reference" = "Transform with a prompt or motion reference";
@@ -1105,7 +1127,6 @@
 "Voice Cleanup model not available" = "Voice Cleanup model not available";
 "Voice Cleanup requires audio or video" = "Voice Cleanup requires audio or video";
 "Volume" = "Volume";
-"Waiting for fal.ai API" = "Waiting for fal.ai API";
 "Warmth" = "Warmth";
 "Watch the tutorial or start creating." = "Watch the tutorial or start creating.";
 "We may email you for follow-up questions" = "We may email you for follow-up questions";

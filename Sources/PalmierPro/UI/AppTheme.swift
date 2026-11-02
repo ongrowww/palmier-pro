@@ -14,19 +14,19 @@ enum AppTheme {
     enum Background {
         static let base = AppTheme.adaptive(
             light: NSColor(red: 241/255, green: 240/255, blue: 237/255, alpha: 1),
-            dark: NSColor(red: 20/255, green: 21/255, blue: 24/255, alpha: 1)
+            dark: NSColor(red: 24/255, green: 25/255, blue: 28/255, alpha: 1)
         )
         static let surface = AppTheme.adaptive(
             light: NSColor(red: 245/255, green: 244/255, blue: 241/255, alpha: 1),
-            dark: NSColor(red: 26/255, green: 27/255, blue: 31/255, alpha: 1)
+            dark: NSColor(red: 30/255, green: 31/255, blue: 35/255, alpha: 1)
         )
         static let raised = AppTheme.adaptive(
             light: NSColor(red: 249/255, green: 248/255, blue: 245/255, alpha: 1),
-            dark: NSColor(red: 34/255, green: 35/255, blue: 40/255, alpha: 1)
+            dark: NSColor(red: 38/255, green: 39/255, blue: 44/255, alpha: 1)
         )
         static let prominent = AppTheme.adaptive(
             light: NSColor(red: 252/255, green: 251/255, blue: 248/255, alpha: 1),
-            dark: NSColor(red: 44/255, green: 45/255, blue: 51/255, alpha: 1)
+            dark: NSColor(red: 48/255, green: 49/255, blue: 55/255, alpha: 1)
         )
 
         /// Alias — empty media slot is a raised plate.
@@ -186,6 +186,8 @@ enum AppTheme {
         static let warning = NSColor.systemOrange
 
         static var warningColor: Color { Color(warning) }
+
+        static var pendingColor: Color { Color(NSColor.systemYellow) }
     }
 
     enum AgentActivity {
@@ -211,7 +213,7 @@ enum AppTheme {
         static let hitSlop: CGFloat = 3
         static let editorWidth: CGFloat = 320
         static let timeFieldWidth: CGFloat = 82
-        static let notesHeight: CGFloat = 54
+        static let commentsHeight: CGFloat = 54
         static let presetColors = [
             "#4094FF", "#40CCE6", "#40BF5C", "#F2C72E", "#FF8C26", "#E64040", "#F259A6",
             "#A666F2", "#8CBFFF", "#73E6B8", "#A6D936", "#C79E6B", "#D1D1D1",
@@ -470,6 +472,12 @@ enum AppTheme {
         static let compactNumericFieldWidth: CGFloat = 36
         static let fontMenuWidth: CGFloat = 160
         static let textEditorMinHeight: CGFloat = 96
+        static let contentInsets = EdgeInsets(
+            top: Spacing.smMd,
+            leading: Spacing.smMd + IconSize.xs + Spacing.sm,
+            bottom: Spacing.smMd,
+            trailing: Spacing.smMd
+        )
     }
 
     enum Window {
@@ -496,16 +504,24 @@ enum AppTheme {
     enum GenerationPanel {
         static let typeTabWidth: CGFloat = IconSize.xl + Spacing.lg
         static let minimumWidthAdjustment: CGFloat = typeTabWidth + Spacing.xxl
-        static let mediaAreaMinHeight: CGFloat = 120
+        static let mediaAreaMinHeight: CGFloat = 60
         static let loadingHeight: CGFloat = 180
         static let promptMinHeight: CGFloat = 40
-        static let referenceTileWidth: CGFloat = 80
-        static let referenceTileHeight: CGFloat = 56
+        static let referenceTileWidth: CGFloat = 72
+        static let referenceTileHeight: CGFloat = 48
     }
 
     enum MediaPanel {
         static let contextRowHeight: CGFloat = IconSize.smMd
         static let speakerNameFieldWidth: CGFloat = 96
+        static let captionIndexTimecodeWidth: CGFloat = 68
+        static let captionIndexDurationWidth: CGFloat = 28
+        static let transcriptSourceMenuWidth: CGFloat = 116
+        static let markerIndexTimeFieldWidth: CGFloat = 64
+        static let markerIndexDurationFieldWidth: CGFloat = 32
+        static let markerIndexCommentHeight: CGFloat = 36
+        static let markerIndexThumbnailHeight = EditorPanel.fieldMinHeight
+            + Spacing.xs + markerIndexCommentHeight
     }
 
     enum Export {
