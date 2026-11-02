@@ -82,6 +82,7 @@ struct GenerationInput: Codable, Sendable, Equatable {
     var backendJobId: String?
     var outputIndex: Int?
     var resultURLs: [String]?
+    var costCredits: Int?
     var refundedCredits: Int?
 }
 

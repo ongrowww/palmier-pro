@@ -4,8 +4,8 @@
 
 **The video editor built for AI.**
 
-<a href="https://github.com/palmier-io/palmier-pro/releases/latest/download/PalmierPro.dmg">
-  <img src="./assets/macos-badge.png" alt="Download Palmier Pro for macOS" width="180" />
+<a href="https://github.com/ongrowww/palmier-pro/actions/workflows/byok-preview.yml">
+  <img src="./assets/macos-badge.png" alt="Builds of the OnGROW BYOK fork for macOS" width="180" />
 </a>
 
 <sub><i>Requires macOS 26 (Tahoe) on Apple Silicon</i></sub>
@@ -40,7 +40,9 @@
 
 ---
 
-Palmier Pro is an open source video editor for Mac. You and your agent can generate and edit videos together inside the timeline.
+This is the OnGROW GPLv3 fork of Palmier Pro, a video editor for Mac with FAL BYOK generation and an in-app Codex provider. You and your agent can generate and edit videos together inside the timeline.
+
+The fork includes upstream source through [`last-gpl-source`](https://github.com/palmier-io/palmier-pro/tree/8805801fa4df8bc2dbc57cb0a854a1f5108f95c6), including v0.7.6 and subsequent published GPL changes. Later official Palmier binaries are proprietary and their source is not published. The upstream watcher verifies this fixed GPL baseline without merging later release metadata. Fork builds are available as artifacts of the [BYOK Preview workflow](https://github.com/ongrowww/palmier-pro/actions/workflows/byok-preview.yml).
 
 ### Swift-native video editor
 
@@ -101,15 +103,15 @@ We bundle a [mcpb](https://github.com/modelcontextprotocol/mcpb) with the app th
 
 ## FAQ
 
-**Is Palmier Pro fully open source?**
+**Is this fork open source?**
 
-The video editor (without the generative AI features) is fully open source. The MCP server and the agent chat are also open source. The only thing that is closed source is the generative AI processing.
+This fork and the historical upstream source through `last-gpl-source` are available under GPLv3. Later official Palmier releases are proprietary. Remote generation services have separate terms and charges.
 
 **Is it free?**
 
 The editor is free. You can download it with no login required, and use it as a video editor like CapCut or Adobe Premiere. You can also use the MCP server for free, and start experimenting using Claude Code/Desktop or Cursor to interact with your timeline editor.
 
-Generative AI features require login and subscription.
+FAL generation uses your own fal.ai API key and account balance. The in-app Codex provider uses your locally installed, signed-in Codex CLI. The unsigned BYOK preview does not include Palmier Cloud access.
 
 **What platforms does it support?**
 

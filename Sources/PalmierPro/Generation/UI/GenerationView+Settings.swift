@@ -127,7 +127,7 @@ extension GenerationView {
                     }
                 }
                 if selectedProvider == .fal {
-                    Section(L10n.string(key: L10n.key("Coming to fal.ai"))) {
+                    Section(L10n.string(key: L10n.key("Not connected"))) {
                         ForEach(FALPreviewCatalog.upcomingVideo) { model in
                             Button {} label: {
                                 Label {
